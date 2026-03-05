@@ -1,18 +1,30 @@
 "use client"
+
 import { useRouter } from "next/navigation"
 import { useState } from "react"
+import { useDispatch } from "react-redux"
+
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ChevronRight } from "lucide-react"
+
 import ProgressIndicator from "./progress-indicator"
 import PersonalDetailsForm from "./personal-details-form"
 import CraftDetailsForm from "./craft-details-form"
 import VoiceIntroductionForm from "./voice-introduction-form"
 
+// ✅ Redux actions
+import {
+  setOnboardingData,
+  completeOnboarding,
+} from "@/store/slices/onboardingSlice"
+
 export default function OnboardingForm() {
   const router = useRouter()
+  const dispatch = useDispatch()
 
   const [currentStep, setCurrentStep] = useState(1)
+
   const [formData, setFormData] = useState({
     fullName: "",
     village: "",
@@ -27,13 +39,13 @@ export default function OnboardingForm() {
 
   const handleNext = () => {
     if (currentStep < totalSteps) {
-      setCurrentStep(currentStep + 1)
+      setCurrentStep((prev) => prev + 1)
     }
   }
 
   const handlePrevious = () => {
     if (currentStep > 1) {
-      setCurrentStep(currentStep - 1)
+      setCurrentStep((prev) => prev - 1)
     }
   }
 
@@ -41,12 +53,19 @@ export default function OnboardingForm() {
     router.push("/artisian/dashboard")
   }
 
+  // ✅ REDUX-INTEGRATED COMPLETE HANDLER
   const handleComplete = () => {
-  console.log("Saving name:", formData.fullName)
-  localStorage.setItem("artisanName", formData.fullName)
-  router.push("/artisian/dashboard")
+    // Save onboarding data globally
+    dispatch(setOnboardingData(formData))
 
+    // Mark onboarding as completed
+    dispatch(completeOnboarding())
 
+    // Optional localStorage (can be removed later)
+    localStorage.setItem("artisanName", formData.fullName)
+
+    // Go to dashboard
+    router.push("/artisian/dashboard")
   }
 
   return (
@@ -70,8 +89,20 @@ export default function OnboardingForm() {
 
             {/* Form Content */}
             <div className="mb-8">
-              {currentStep === 1 && <PersonalDetailsForm formData={formData} setFormData={setFormData} />}
-              {currentStep === 2 && <CraftDetailsForm formData={formData} setFormData={setFormData} />}
+              {currentStep === 1 && (
+                <PersonalDetailsForm
+                  formData={formData}
+                  setFormData={setFormData}
+                />
+              )}
+
+              {currentStep === 2 && (
+                <CraftDetailsForm
+                  formData={formData}
+                  setFormData={setFormData}
+                />
+              )}
+
               {currentStep === 3 && <VoiceIntroductionForm />}
             </div>
 
@@ -102,7 +133,9 @@ export default function OnboardingForm() {
                   onClick={currentStep === totalSteps ? handleComplete : handleNext}
                   className="bg-primary hover:bg-primary/90 text-primary-foreground gap-2"
                 >
-                  {currentStep === totalSteps ? "Continue to Dashboard" : "Continue"}
+                  {currentStep === totalSteps
+                    ? "Continue to Dashboard"
+                    : "Continue"}
                   <ChevronRight size={18} />
                 </Button>
               </div>
