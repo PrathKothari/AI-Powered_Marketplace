@@ -25,6 +25,11 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str
 
+    # Firebase
+    FIREBASE_PROJECT_ID: str
+    FIREBASE_PRIVATE_KEY: str
+    FIREBASE_CLIENT_EMAIL: str
+
     # AI/ML
     ML_MODEL_PATH: str = "./app/ml/models"
 

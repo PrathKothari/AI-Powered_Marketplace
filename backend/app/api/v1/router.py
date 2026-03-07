@@ -7,12 +7,14 @@ from app.api.v1.endpoints import (
     live,
     recommendation,
     users,
-    analytics
+    analytics,
+    auth
 )
 
 api_router = APIRouter()
 
 # Register routes for each functional domain
+api_router.include_router(auth.router, prefix="/auth", tags=["Auth"])
 api_router.include_router(storytelling.router, prefix="/storytelling", tags=["Storytelling"])
 api_router.include_router(catalog.router, prefix="/catalog", tags=["Catalog"])
 api_router.include_router(discovery.router, prefix="/discovery", tags=["Discovery"])

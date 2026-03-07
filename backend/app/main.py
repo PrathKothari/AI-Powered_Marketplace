@@ -8,10 +8,14 @@ from app.api.router import api_router
 # Setup logging
 setup_logging()
 
+from app.core.firebase import init_firebase
+
 def create_application() -> FastAPI:
     """
     Initialize and configure the FastAPI application.
     """
+    # Initialize Firebase Admin SDK
+    init_firebase()
     application = FastAPI(
         title=settings.PROJECT_NAME,
         openapi_url=f"{settings.API_V1_STR}/openapi.json",

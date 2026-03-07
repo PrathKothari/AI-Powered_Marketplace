@@ -1,8 +1,10 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
+import { fetchApi, setAuthToken } from "@/lib/api"
+import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card } from "@/components/ui/card"
@@ -85,18 +87,32 @@ export default function ArtisanLogin() {
   )
 }
 
+
 function EmailLoginForm() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
+  const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    // Simulate login
-    setTimeout(() => {
+
+    try {
+      const response = await fetchApi<{ access_token: string }>("/auth/login", {
+        data: { email, password },
+      })
+
+      setAuthToken(response.access_token)
+      toast.success("Successfully logged in!")
+
+      // Redirect to artisan dashboard
+      router.push("/artisian")
+    } catch (error: any) {
+      toast.error(error.message || "Login failed. Please check your credentials.")
+    } finally {
       setLoading(false)
-    }, 1500)
+    }
   }
 
   return (
@@ -141,3 +157,4 @@ function EmailLoginForm() {
     </form>
   )
 }
+
