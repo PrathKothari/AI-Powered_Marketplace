@@ -8,11 +8,12 @@ from app.core.config import settings
 
 router = APIRouter()
 
-# Firestore client instance
-db = firestore.client()
-
 # Firebase Identity Toolkit API URL for REST operations
 IDENTITY_TOOLKIT_URL = "https://identitytoolkit.googleapis.com/v1/accounts"
+
+def get_firestore_client():
+    """Lazy initialization of Firestore client to avoid import-time errors."""
+    return firestore.client()
 
 @router.post("/signup", status_code=status.HTTP_201_CREATED)
 async def signup(request: SignUpRequest):
@@ -43,7 +44,7 @@ async def signup(request: SignUpRequest):
             name=request.name,
             email=request.email
         )
-        db.collection("users").document(user_record.uid).set(user_doc.model_dump(mode='json'))
+        get_firestore_client().collection("users").document(user_record.uid).set(user_doc.model_dump(mode='json'))
 
         # 4. If artisan, create empty document in 'artisans' collection
         if request.role == "artisan":
@@ -52,7 +53,7 @@ async def signup(request: SignUpRequest):
                 craftType="Not Specified", # Default
                 region="Not Specified"    # Default
             )
-            db.collection("artisans").document(user_record.uid).set(artisan_doc.model_dump(mode='json'))
+            get_firestore_client().collection("artisans").document(user_record.uid).set(artisan_doc.model_dump(mode='json'))
 
         return {"uid": user_record.uid, "message": "User created successfully"}
 
