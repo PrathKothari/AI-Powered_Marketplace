@@ -76,7 +76,7 @@ export default function ArtisanLogin() {
           <div className="mt-6 text-center">
             <p className="text-sm text-muted-foreground">
               New here?{" "}
-              <a href="/signup" className="font-semibold text-primary hover:text-primary/80 transition-colors">
+              <a href="/artisian/signup" className="font-semibold text-primary hover:text-primary/80 transition-colors">
                 Create an Artisan Account
               </a>
             </p>
