@@ -1,3 +1,4 @@
+// UNUSED - safe to delete (duplicate of components/product-card.tsx and not imported anywhere)
 "use client"
 
 import { Trash2 } from "lucide-react"
@@ -14,10 +15,10 @@ interface Product {
 
 interface ProductCardProps {
   product: Product
-  onDelete: (id: number) => void
+  onDeleteAction: (id: number) => void
 }
 
-export default function ProductCard({ product, onDelete }: ProductCardProps) {
+export default function ProductCard({ product, onDeleteAction }: ProductCardProps) {
   return (
     <div className="bg-card border border-border rounded-xl overflow-hidden shadow-sm hover:shadow-md transition">
       <div className="relative h-48 bg-muted">
@@ -40,7 +41,7 @@ export default function ProductCard({ product, onDelete }: ProductCardProps) {
           variant="outline"
           size="sm"
           className="mt-2 w-full"
-          onClick={() => onDelete(product.id)}
+          onClick={() => onDeleteAction(product.id)}
         >
           <Trash2 className="w-4 h-4 mr-2" />
           Delete

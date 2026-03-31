@@ -39,7 +39,7 @@ export function CraftCard({
   }
 
  const goToCraft = () => {
-  router.push(`/buyer/product/${id}`)
+  router.push(`/product/${id}`)
 }
 
   const goToArtisan = (e: React.MouseEvent) => {

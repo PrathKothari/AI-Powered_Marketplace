@@ -1,6 +1,6 @@
 'use client'
 
-export type MarketplaceFilter = 'all' | 'in-stock' | 'out-stock'
+export type MarketplaceFilter = 'all' | 'in-stock' | 'out-of-stock'
 
 interface FilterBarProps {
   activeFilter: MarketplaceFilter
@@ -11,7 +11,7 @@ export function FilterBar({ activeFilter, onFilterChange }: FilterBarProps) {
   const filters: { id: MarketplaceFilter; label: string }[] = [
     { id: 'all', label: 'All' },
     { id: 'in-stock', label: 'Active' },
-    { id: 'out-stock', label: 'Out of Stock' },
+    { id: 'out-of-stock', label: 'Out of Stock' },
   ]
 
   return (

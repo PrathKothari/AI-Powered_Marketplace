@@ -3,7 +3,21 @@
 import { useState } from 'react'
 import { OrderCard } from './order-card'
 
-const orders = [
+export type OrderStatus = 'pending' | 'paid' | 'shipped' | 'delivered';
+
+export interface Order {
+  id: string;
+  productName: string;
+  productImage: string;
+  buyerName: string;
+  orderDate: string;
+  price: string;
+  status: OrderStatus;
+  rating?: number;
+  review?: string;
+}
+
+const orders: Order[] = [
   {
     id: 'ORD-2024-001',
     productName: 'Handwoven Ceramic Vase',
@@ -60,7 +74,7 @@ export function OrdersList() {
 
   const updateOrderStatus = (id: string, newStatus: string, data?: Record<string, unknown>) => {
     setOrders(orders_.map(order =>
-      order.id === id ? { ...order, status: newStatus, ...data } : order
+      order.id === id ? { ...order, status: newStatus as OrderStatus, ...data } : order
     ))
   }
 
