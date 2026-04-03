@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     FIREBASE_PRIVATE_KEY: str = ""
     FIREBASE_CLIENT_EMAIL: str = ""
     FIREBASE_API_KEY: Optional[str] = None
+    FIREBASE_STORAGE_BUCKET: str = ""
 
     # AI/ML
     ML_MODEL_PATH: str = "./app/ml/models"

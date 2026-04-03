@@ -19,4 +19,7 @@ def init_firebase():
         }
         
         cred = credentials.Certificate(cert_dict)
-        firebase_admin.initialize_app(cred)
+        options = {}
+        if settings.FIREBASE_STORAGE_BUCKET:
+            options["storageBucket"] = settings.FIREBASE_STORAGE_BUCKET
+        firebase_admin.initialize_app(cred, options or None)

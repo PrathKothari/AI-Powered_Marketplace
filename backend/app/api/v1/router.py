@@ -8,7 +8,8 @@ from app.api.v1.endpoints import (
     recommendation,
     users,
     analytics,
-    auth
+    auth,
+    ingest
 )
 
 api_router = APIRouter()
@@ -22,3 +23,4 @@ api_router.include_router(live.router, prefix="/live", tags=["Live"])
 api_router.include_router(recommendation.router, prefix="/recommendation", tags=["Recommendation"])
 api_router.include_router(users.router, prefix="/users", tags=["Users"])
 api_router.include_router(analytics.router, prefix="/analytics", tags=["Analytics"])
+api_router.include_router(ingest.router, prefix="/ingest", tags=["Ingest"])

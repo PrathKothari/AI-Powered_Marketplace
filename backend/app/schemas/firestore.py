@@ -45,7 +45,7 @@ class StoryBase(BaseModel):
     language: str
     storyText: str
     audioUrl: Optional[str] = None
-    videoUrl: Optional[str] = None
+    ImageUrls: Optional[List[str]] = None
     createdAt: datetime = Field(default_factory=datetime.utcnow)
 
     model_config = ConfigDict(from_attributes=True)
@@ -64,3 +64,20 @@ class SearchLogBase(BaseModel):
     createdAt: datetime = Field(default_factory=datetime.utcnow)
 
     model_config = ConfigDict(from_attributes=True)
+
+class MediaAssetBase(BaseModel):
+    assetId: str
+    artisanId: str
+    productId: Optional[str] = None
+    mediaType: str = Field(..., description="'image' or 'audio'")
+    originalFilename: str
+    storageUrl: str
+    thumbnailUrl: Optional[str] = None
+    width: Optional[int] = None
+    height: Optional[int] = None
+    durationSeconds: Optional[float] = None
+    sizeBytes: int
+    createdAt: datetime = Field(default_factory=datetime.utcnow)
+
+    model_config = ConfigDict(from_attributes=True)
+
