@@ -34,6 +34,11 @@ class Settings(BaseSettings):
     # AI/ML
     ML_MODEL_PATH: str = "./app/ml/models"
 
+    # Pinecone
+    PINECONE_API_KEY: str = ""
+    PINECONE_IMAGE_INDEX: str = "product-images"
+    PINECONE_TEXT_INDEX: str = "product-text"
+
     model_config = SettingsConfigDict(case_sensitive=True, env_file=".env", env_file_encoding='utf-8')
 
 settings = Settings()
