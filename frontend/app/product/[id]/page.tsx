@@ -10,6 +10,7 @@ import Link from 'next/link'
 import { useCart } from '@/context/CartContext'
 import { Product } from '@/lib/types/product'
 import { getProducts } from '@/lib/products'
+import ProductCard from '@/components/product-card'
 
 export default function ProductPage() {
   const router = useRouter()
@@ -76,6 +77,20 @@ export default function ProductPage() {
       .filter((p: Product | undefined): p is Product => Boolean(p))
   }, [product, allProducts])
 
+  const recommendedCategoryProducts = useMemo<Product[]>(() => {
+    if (!product || allProducts.length === 0) return []
+    
+    // Filter by same category, excluding the current product
+    const sameCategory = allProducts.filter(p => p.category === product.category && String(p.id) !== String(product.id))
+    
+    // If none found in same category, use first 3 from allProducts (excluding current product)
+    if (sameCategory.length === 0) {
+       return allProducts.filter(p => String(p.id) !== String(product.id)).slice(0, 3)
+    }
+    
+    return sameCategory.slice(0, 3)
+  }, [product, allProducts])
+
   const storyVideo = product?.storyVideo || 'https://www.w3schools.com/html/mov_bbb.mp4'
 
   const handleAddToCart = () => {
@@ -119,6 +134,27 @@ export default function ProductPage() {
               <h1 className="text-3xl font-bold mb-3">{product.name}</h1>
               <p className="text-lg font-semibold text-indigo-600 mb-2">${product.price.toFixed(2)}</p>
               <p className="text-sm text-muted-foreground mb-4">{product.description}</p>
+
+              {/* Artisan Info */}
+              <div className="flex items-center gap-3 mb-5 p-3 rounded-lg bg-slate-50 border border-slate-100">
+                <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold uppercase flex-shrink-0">
+                  {product.artisan.name.charAt(0)}
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-slate-800">{product.artisan.name}</p>
+                  <p className="text-xs text-muted-foreground">{product.artisan.location}</p>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    ✓ Verified Artisan
+                  </span>
+                  {(product.rating ?? 0) > 4 && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                      ⭐ Top Artisan
+                    </span>
+                  )}
+                </div>
+              </div>
 
               <div className="grid grid-cols-2 gap-4">
                 {product.images?.map((img: string, index: number) => (
@@ -257,7 +293,18 @@ export default function ProductPage() {
             </Card>
           </aside>
         </div>
+
+        {/* You may also like Section */}
+        <div className="mt-20">
+          <h2 className="text-2xl font-bold text-slate-900 mb-8 border-b border-border pb-4">You may also like</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+            {recommendedCategoryProducts.map((p) => (
+              <ProductCard key={p.id} product={p as Product} onDeleteAction={() => {}} />
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   )
 }
+
