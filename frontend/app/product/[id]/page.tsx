@@ -2,12 +2,12 @@
 
 import { useMemo, useRef, useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ChevronLeft, ShoppingCart } from 'lucide-react'
+import { ChevronLeft, ShoppingCart, Star } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
-import { addToCart } from '@/lib/cart'
+import { useCart } from '@/context/CartContext'
 import { Product } from '@/lib/types/product'
 import { getProducts } from '@/lib/products'
 
@@ -16,15 +16,58 @@ export default function ProductPage() {
   const params = useParams()
   const productId = params.id as string
   const addToCartRef = useRef<HTMLDivElement | null>(null)
+  
+  const { addToCart } = useCart()
 
   const [product, setProduct] = useState<Product | undefined>(undefined)
   const [allProducts, setAllProducts] = useState<Product[]>([])
+
+  // Reviews state
+  interface Review { name: string; rating: number; comment: string; }
+  const [reviews, setReviews] = useState<Review[]>([])
+  const [newReviewName, setNewReviewName] = useState("")
+  const [newReviewRating, setNewReviewRating] = useState(5)
+  const [newReviewComment, setNewReviewComment] = useState("")
 
   useEffect(() => {
     const products = getProducts()
     setAllProducts(products)
     setProduct(products.find(p => String(p.id) === String(productId)))
+
+    // Load reviews dynamically from localStorage
+    const storageKey = `reviews-${productId}`
+    const stored = localStorage.getItem(storageKey)
+    if (stored) {
+      setReviews(JSON.parse(stored))
+    } else {
+      const initialMock = [
+        { name: "Rahul", rating: 5, comment: "Amazing quality!" },
+        { name: "Priya", rating: 4, comment: "Loved it" }
+      ]
+      setReviews(initialMock)
+      localStorage.setItem(storageKey, JSON.stringify(initialMock))
+    }
   }, [productId])
+
+  const handleReviewSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newReviewName || !newReviewComment) return
+
+    const storageKey = `reviews-${productId}`
+    const newReview = { name: newReviewName, rating: newReviewRating, comment: newReviewComment }
+    const updated = [newReview, ...reviews]
+    setReviews(updated)
+    localStorage.setItem(storageKey, JSON.stringify(updated))
+
+    // Reset form
+    setNewReviewName("")
+    setNewReviewRating(5)
+    setNewReviewComment("")
+  }
+
+  const averageRating = reviews.length > 0 
+    ? (reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length).toFixed(1)
+    : "0.0"
 
   const relatedProducts = useMemo<Product[]>(() => {
     if (!product?.relatedProducts) return []
@@ -43,6 +86,8 @@ export default function ProductPage() {
       price: product.price,
       image: product.images?.[0] ?? '',
     })
+    // Optional: provide feedback or redirect
+    router.push('/buyer/cart')
   }
 
   if (!product) {
@@ -96,6 +141,83 @@ export default function ProductPage() {
                   <p className="text-muted-foreground">Story not available</p>
                 </div>
               )}
+            </div>
+
+            {/* Ratings & Reviews (Dynamic UI) */}
+            <div className="rounded-xl bg-white p-5 shadow-sm border border-border">
+              <h2 className="text-xl font-semibold mb-6">Ratings & Reviews</h2>
+              
+              <div className="flex items-center gap-4 mb-8">
+                <div className="flex items-center gap-1">
+                  {[...Array(5)].map((_, i) => (
+                    <Star 
+                      key={i} 
+                      className={`w-6 h-6 ${i < Math.round(Number(averageRating)) ? 'fill-yellow-400 text-yellow-400' : 'fill-muted text-muted'}`} 
+                    />
+                  ))}
+                </div>
+                <div className="text-lg font-bold text-slate-800">{averageRating}</div>
+                <div className="text-sm text-muted-foreground">({reviews.length} reviews)</div>
+              </div>
+
+              {/* Add Review Form */}
+              <form onSubmit={handleReviewSubmit} className="mb-8 space-y-4 p-5 border border-slate-200 rounded-xl bg-slate-50/50">
+                <h3 className="font-semibold text-slate-800 mb-2">Write a Review</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <input 
+                    type="text" 
+                    placeholder="Your Name" 
+                    required 
+                    value={newReviewName}
+                    onChange={(e) => setNewReviewName(e.target.value)}
+                    className="w-full p-2.5 border border-slate-200 rounded-lg focus:outline-primary transition-all text-sm"
+                  />
+                  <select 
+                    value={newReviewRating}
+                    onChange={(e) => setNewReviewRating(Number(e.target.value))}
+                    className="w-full p-2.5 border border-slate-200 rounded-lg focus:outline-primary transition-all text-sm bg-white"
+                  >
+                    <option value={5}>⭐⭐⭐⭐⭐ (5) Excellent</option>
+                    <option value={4}>⭐⭐⭐⭐ (4) Good</option>
+                    <option value={3}>⭐⭐⭐ (3) Average</option>
+                    <option value={2}>⭐⭐ (2) Poor</option>
+                    <option value={1}>⭐ (1) Terrible</option>
+                  </select>
+                </div>
+                <textarea 
+                  placeholder="Tell us what you loved about this craft..." 
+                  required
+                  value={newReviewComment}
+                  onChange={(e) => setNewReviewComment(e.target.value)}
+                  className="w-full p-3 border border-slate-200 rounded-lg focus:outline-primary transition-all h-24 resize-none text-sm"
+                />
+                <Button type="submit" className="px-6 font-bold">Post Review</Button>
+              </form>
+
+              {/* Reviews List */}
+              <div className="space-y-4">
+                {reviews.map((review, index) => (
+                  <div key={index} className="p-4 rounded-lg bg-white border border-slate-100 shadow-sm transition hover:shadow-md">
+                    <div className="flex justify-between items-start mb-2">
+                      <span className="font-semibold text-slate-800">{review.name}</span>
+                      <div className="flex gap-0.5">
+                        {[...Array(5)].map((_, i) => (
+                          <Star 
+                            key={i} 
+                            className={`w-4 h-4 ${i < review.rating ? 'fill-yellow-400 text-yellow-400' : 'fill-muted text-muted'}`} 
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    <p className="text-sm text-slate-600 leading-relaxed">{review.comment}</p>
+                  </div>
+                ))}
+                {reviews.length === 0 && (
+                  <p className="text-sm text-slate-500 italic py-4 text-center border border-dashed rounded-lg">
+                    No reviews yet. Be the first to share your experience!
+                  </p>
+                )}
+              </div>
             </div>
 
             {relatedProducts.length > 0 && (

@@ -6,24 +6,18 @@ import { getUser, User } from '@/lib/auth'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { LogOut, Package, Star, TrendingUp, CreditCard, ShoppingBag, BarChart3, ChevronRight } from 'lucide-react'
-
-// Mock Data
-const mockOrders = [
-  { id: 1, name: "Handwoven Basket", price: 45, date: "Oct 24, 2023" },
-  { id: 2, name: "Ceramic Mug Set", price: 32, date: "Oct 21, 2023" },
-  { id: 3, name: "Leather Journal", price: 55, date: "Oct 15, 2023" }
-]
-
-const mockProducts = [
-  { id: 1, name: "Handwoven Basket", sales: 48, rating: 4.8 },
-  { id: 2, name: "Knitted Wool Scarf", sales: 24, rating: 4.5 },
-  { id: 3, name: "Ceramic Vase", sales: 12, rating: 4.2 }
-]
+import { getOrders, Order } from '@/lib/orders'
+import { getProducts } from '@/lib/products'
+import { Product } from '@/lib/types/product'
 
 export default function DashboardPage() {
   const router = useRouter()
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  
+  // Real data state
+  const [orders, setOrders] = useState<Order[]>([])
+  const [products, setProducts] = useState<Product[]>([])
 
   useEffect(() => {
     const currentUser = getUser()
@@ -31,6 +25,8 @@ export default function DashboardPage() {
       router.push('/login')
     } else {
       setUser(currentUser)
+      setOrders(getOrders())
+      setProducts(getProducts())
       setIsLoading(false)
     }
   }, [router])
@@ -47,6 +43,18 @@ export default function DashboardPage() {
       </div>
     )
   }
+
+  // Derived Buyer Stats
+  const totalSpending = orders.reduce((sum, o) => sum + o.total, 0)
+  const totalItemsPurchased = orders.reduce((sum, o) => sum + o.items.reduce((iSum, item) => iSum + item.quantity, 0), 0)
+
+  // Derived Artisan Stats
+  const artisanProducts = products // In a real app we'd filter by artisan ID
+  const totalSalesCount = artisanProducts.reduce((sum, p) => sum + (p.sales || 0), 0)
+  const totalRevenue = artisanProducts.reduce((sum, p) => sum + ((p.sales || 0) * (p.price || 0)), 0)
+  const avgRating = artisanProducts.length > 0 
+    ? artisanProducts.reduce((sum, p) => sum + (p.rating || 0), 0) / artisanProducts.length 
+    : 0
 
   // --- Profile Card Fragment ---
   const ProfileSummary = () => (
@@ -90,7 +98,7 @@ export default function DashboardPage() {
             </div>
             <div>
               <p className="text-sm font-medium text-slate-500">Total Orders</p>
-              <h3 className="text-2xl font-bold text-slate-800">12</h3>
+              <h3 className="text-2xl font-bold text-slate-800">{orders.length}</h3>
             </div>
           </div>
         </Card>
@@ -102,7 +110,7 @@ export default function DashboardPage() {
             </div>
             <div>
               <p className="text-sm font-medium text-slate-500">Total Spending</p>
-              <h3 className="text-2xl font-bold text-slate-800">$458.00</h3>
+              <h3 className="text-2xl font-bold text-slate-800">${totalSpending.toFixed(2)}</h3>
             </div>
           </div>
         </Card>
@@ -114,7 +122,7 @@ export default function DashboardPage() {
             </div>
             <div>
               <p className="text-sm font-medium text-slate-500">Items Purchased</p>
-              <h3 className="text-2xl font-bold text-slate-800">18</h3>
+              <h3 className="text-2xl font-bold text-slate-800">{totalItemsPurchased}</h3>
             </div>
           </div>
         </Card>
@@ -123,26 +131,31 @@ export default function DashboardPage() {
       <Card className="rounded-xl shadow-sm border-border bg-white overflow-hidden">
         <div className="p-6 border-b border-slate-100 flex items-center justify-between">
           <h2 className="text-lg font-bold text-slate-800">Recent Orders</h2>
-          <Button variant="ghost" size="sm" className="text-primary hover:text-primary/80">View All</Button>
+          <Button variant="ghost" size="sm" onClick={() => router.push('/orders')} className="text-primary hover:text-primary/80">View All</Button>
         </div>
         <div className="divide-y divide-slate-100">
-          {mockOrders.map((order) => (
-            <div key={order.id} className="p-6 flex items-center justify-between hover:bg-slate-50 transition-colors group cursor-pointer">
+          {orders.slice(0, 5).map((order) => (
+            <div key={order.id} onClick={() => router.push('/orders')} className="p-6 flex items-center justify-between hover:bg-slate-50 transition-colors group cursor-pointer">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400">
+                <div className="w-12 h-12 rounded-lg bg-primary/5 flex items-center justify-center text-primary">
                   <Package className="w-6 h-6" />
                 </div>
                 <div>
-                  <h4 className="font-semibold text-slate-800">{order.name}</h4>
-                  <p className="text-sm text-slate-500">Ordered on {order.date}</p>
+                  <h4 className="font-semibold text-slate-800">Order {order.id.slice(0, 10)}...</h4>
+                  <p className="text-sm text-slate-500">Placed on {new Date(order.date).toLocaleDateString()}</p>
                 </div>
               </div>
               <div className="flex items-center gap-4">
-                <span className="font-bold text-slate-800">${order.price.toFixed(2)}</span>
+                <span className="font-bold text-slate-800">${order.total.toFixed(2)}</span>
                 <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-primary transition-colors" />
               </div>
             </div>
           ))}
+          {orders.length === 0 && (
+            <div className="p-12 text-center text-slate-400 font-medium italic">
+              No orders found.
+            </div>
+          )}
         </div>
       </Card>
     </div>
@@ -157,10 +170,10 @@ export default function DashboardPage() {
             <div className="p-2 bg-orange-50 text-orange-600 rounded-lg">
               <Package className="w-5 h-5" />
             </div>
-            <span className="text-xs font-semibold text-green-600 bg-green-50 px-2 py-1 rounded-full">+4%</span>
+            <span className="text-xs font-semibold text-green-600 bg-green-50 px-2 py-1 rounded-full">Inventory</span>
           </div>
           <p className="text-sm font-medium text-slate-500">Total Products</p>
-          <h3 className="text-2xl font-bold text-slate-800">24</h3>
+          <h3 className="text-2xl font-bold text-slate-800">{artisanProducts.length}</h3>
         </Card>
 
         <Card className="p-6 rounded-xl shadow-sm border-border bg-white">
@@ -168,10 +181,10 @@ export default function DashboardPage() {
             <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
               <TrendingUp className="w-5 h-5" />
             </div>
-            <span className="text-xs font-semibold text-green-600 bg-green-50 px-2 py-1 rounded-full">+12%</span>
+            <span className="text-xs font-semibold text-green-600 bg-green-50 px-2 py-1 rounded-full">Volume</span>
           </div>
-          <p className="text-sm font-medium text-slate-500">Total Sales</p>
-          <h3 className="text-2xl font-bold text-slate-800">142</h3>
+          <p className="text-sm font-medium text-slate-500">Total Units Sold</p>
+          <h3 className="text-2xl font-bold text-slate-800">{totalSalesCount}</h3>
         </Card>
 
         <Card className="p-6 rounded-xl shadow-sm border-border bg-white">
@@ -179,11 +192,11 @@ export default function DashboardPage() {
             <div className="p-2 bg-yellow-50 text-yellow-600 rounded-lg">
               <Star className="w-5 h-5" />
             </div>
-            <span className="text-xs font-semibold text-slate-500 bg-slate-50 px-2 py-1 rounded-full">Consistent</span>
+            <span className="text-xs font-semibold text-slate-500 bg-slate-50 px-2 py-1 rounded-full">Customer Love</span>
           </div>
           <p className="text-sm font-medium text-slate-500">Average Rating</p>
           <h3 className="text-2xl font-bold text-slate-800 flex items-center gap-1">
-            4.8<Star className="w-5 h-5 fill-yellow-400 text-yellow-500 inline -mt-1" />
+            {avgRating.toFixed(1)}<Star className="w-5 h-5 fill-yellow-400 text-yellow-500 inline -mt-1" />
           </h3>
         </Card>
 
@@ -192,17 +205,17 @@ export default function DashboardPage() {
             <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
               <BarChart3 className="w-5 h-5" />
             </div>
-            <span className="text-xs font-semibold text-green-600 bg-green-50 px-2 py-1 rounded-full">+18%</span>
+            <span className="text-xs font-semibold text-green-600 bg-green-50 px-2 py-1 rounded-full">Total Earned</span>
           </div>
           <p className="text-sm font-medium text-slate-500">Total Revenue</p>
-          <h3 className="text-2xl font-bold text-emerald-600">$4,850</h3>
+          <h3 className="text-2xl font-bold text-emerald-600">${totalRevenue.toLocaleString()}</h3>
         </Card>
       </div>
 
       <Card className="rounded-xl shadow-sm border-border bg-white overflow-hidden">
         <div className="p-6 border-b border-slate-100 flex items-center justify-between">
           <h2 className="text-lg font-bold text-slate-800">Product Performance</h2>
-          <Button variant="outline" size="sm" className="hidden sm:flex border-slate-200">Export Report</Button>
+          <Button variant="outline" size="sm" onClick={() => router.push('/artisan/inventory')} className="hidden sm:flex border-slate-200">Manage Inventory</Button>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -215,26 +228,26 @@ export default function DashboardPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {mockProducts.map((p) => {
-                const maxSales = Math.max(...mockProducts.map(mp => mp.sales))
-                const progressWidth = Math.round((p.sales / maxSales) * 100)
+              {artisanProducts.slice(0, 10).map((p) => {
+                const maxSales = Math.max(...artisanProducts.map(mp => mp.sales || 0), 1)
+                const progressWidth = Math.round(((p.sales || 0) / maxSales) * 100)
                 
                 return (
                   <tr key={p.id} className="hover:bg-slate-50/50 flex flex-col sm:table-row p-4 sm:p-0">
                     <td className="sm:p-4 py-2">
-                       <h4 className="font-semibold text-slate-800">{p.name}</h4>
+                       <h4 className="font-semibold text-slate-800">{p.name || p.title}</h4>
                        <span className="text-xs text-slate-500 sm:hidden mt-1 flex items-center gap-1">
                           Sales: {p.sales} • <Star className="w-3 h-3 fill-yellow-400 text-yellow-500" /> {p.rating}
                        </span>
                     </td>
                     <td className="p-4 hidden md:table-cell">
                       <div className="flex items-center gap-1 text-slate-700 font-medium">
-                        <Star className="w-4 h-4 fill-yellow-400 text-yellow-500" /> {p.rating}
+                        <Star className="w-4 h-4 fill-yellow-400 text-yellow-500" /> {p.rating?.toFixed(1) || '0.0'}
                       </div>
                     </td>
                     <td className="sm:p-4 py-1 hidden sm:table-cell">
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full font-medium text-xs bg-blue-50 text-blue-700 border border-blue-100">
-                        {p.sales} sales
+                        {p.sales || 0} sales
                       </span>
                     </td>
                     <td className="sm:p-4 py-2 sm:text-right align-middle w-full sm:w-48">
@@ -251,6 +264,13 @@ export default function DashboardPage() {
                   </tr>
                 )
               })}
+              {artisanProducts.length === 0 && (
+                <tr>
+                   <td colSpan={4} className="p-12 text-center text-slate-400 font-medium italic">
+                      No products listed yet.
+                   </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

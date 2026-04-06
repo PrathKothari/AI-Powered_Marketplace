@@ -2,9 +2,9 @@
 
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Star, Heart } from 'lucide-react'
+import { Star, Heart, ShoppingBag } from 'lucide-react'
 import { useState } from 'react'
-import { addToCart } from '@/lib/cart'
+import { useCart } from '@/context/CartContext'
 
 const products = [
   {
@@ -83,6 +83,7 @@ const products = [
 
 export default function ProductsGrid() {
   const [favorites, setFavorites] = useState<number[]>([])
+  const { addToCart } = useCart()
 
   const toggleFavorite = (id: number) => {
     setFavorites(prev =>
@@ -95,7 +96,7 @@ export default function ProductsGrid() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">Featured Products</h2>
+          <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4 underline decoration-primary decoration-4 underline-offset-8">Featured Products</h2>
           <p className="text-muted-foreground text-lg">
             Handpicked selections from our talented artisan community
           </p>
@@ -147,15 +148,14 @@ export default function ProductsGrid() {
                 </div>
 
                 {/* Seller */}
-                <p className="text-xs text-muted-foreground">{product.seller}</p>
+                <p className="text-xs text-muted-foreground italic opacity-70">{product.seller}</p>
 
-                  <div className="flex items-center justify-between mt-auto pt-2 border-t border-border">
-                  <p className="text-lg font-bold text-primary">{product.price}</p>
+                  <div className="flex items-center justify-between mt-auto pt-4 border-t border-border/40">
+                  <p className="text-xl font-bold text-primary font-mono">{product.price}</p>
                   <Button
                     size="sm"
-                    className="bg-primary hover:bg-primary/90 text-primary-foreground h-8 text-xs"
+                    className="bg-primary hover:bg-primary/90 text-primary-foreground h-9 px-4 text-xs font-bold shadow-md shadow-primary/20 hover:scale-105 active:scale-95 transition-all"
                     onClick={() => {
-                      // Note: We parse the price since it's a string in the mock ("$85.00")
                       const parsedPrice = parseFloat(product.price.replace('$', '')) || 0;
                       addToCart({
                         id: product.id,
@@ -165,6 +165,7 @@ export default function ProductsGrid() {
                       });
                     }}
                   >
+                    <ShoppingBag className="w-3.5 h-3.5 mr-2" />
                     Add
                   </Button>
                 </div>

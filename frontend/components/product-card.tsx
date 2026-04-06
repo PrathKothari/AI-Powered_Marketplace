@@ -4,10 +4,9 @@ import { useState } from "react"
 import { Edit2, Eye, Trash2, ShoppingCart } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Product } from "@/lib/types/product"
-import { addToCart } from "@/lib/cart"
+import { useCart } from "@/context/CartContext"
 
 interface ProductCardProps {
   product: Product
@@ -17,6 +16,7 @@ interface ProductCardProps {
 export default function ProductCard({ product, onDeleteAction }: ProductCardProps) {
   const [isHovered, setIsHovered] = useState(false)
   const router = useRouter()
+  const { addToCart } = useCart()
 
   const getStatusColor = () => {
     switch (product.status) {
@@ -52,12 +52,13 @@ export default function ProductCard({ product, onDeleteAction }: ProductCardProp
       price: product.price,
       image: product.images?.[0] ?? '',
     })
+    // Optional: provide visual feedback or redirect
+    router.push('/buyer/cart')
   }
 
   return (
     <Card
       onClick={() => {
-        console.log("Navigating to:", product.id)
         router.push(`/product/${product.id}`)
       }}
       className={`overflow-hidden border-accent/20 bg-card cursor-pointer hover:scale-105 transition-transform duration-300 hover:shadow-lg ${
@@ -87,43 +88,41 @@ export default function ProductCard({ product, onDeleteAction }: ProductCardProp
 
       <div className="p-4 space-y-4">
         <div className="space-y-1">
-          <h3 className="font-semibold text-foreground text-lg">{product.name}</h3>
-          <p className="text-primary font-bold text-lg">${product.price.toFixed(2)}</p>
+          <div className="flex justify-between items-start">
+            <h3 className="font-semibold text-foreground text-lg line-clamp-1">{product.name}</h3>
+            <p className="text-primary font-bold text-lg">${product.price.toFixed(2)}</p>
+          </div>
           {product.relatedProducts?.length ? (
             <p className="text-xs text-muted-foreground mt-1">{product.relatedProducts.length} related products</p>
           ) : null}
         </div>
 
-        <div className="flex gap-2">
+        <div className="grid grid-cols-2 gap-2">
           <Button 
-            variant="ghost" 
+            variant="default" 
             size="sm" 
-            className="flex-1 text-xs hover:bg-accent/10"
-            onClick={(e) => {
-              e.stopPropagation()
-              // Edit functionality hook here
-            }}
+            className="text-xs bg-primary hover:bg-primary/90"
+            onClick={handleAddCart}
           >
-            <Edit2 className="w-4 h-4 mr-1" />
-            Edit
+            <ShoppingCart className="w-4 h-4 mr-1" />
+            Add
           </Button>
           <Button 
-            variant="ghost" 
+            variant="outline" 
             size="sm" 
-            className="flex-1 text-xs hover:bg-accent/10"
+            className="text-xs border-accent/20 hover:bg-accent/10"
             onClick={(e) => {
               e.stopPropagation()
-              console.log("Navigating to:", product.id)
               router.push(`/product/${product.id}`)
             }}
           >
             <Eye className="w-4 h-4 mr-1" />
             View
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="flex-1 text-xs hover:bg-destructive/10 text-destructive"
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="text-xs hover:bg-muted text-muted-foreground"
             onClick={(e) => {
               e.stopPropagation()
               onDeleteAction(product.id)
@@ -131,6 +130,18 @@ export default function ProductCard({ product, onDeleteAction }: ProductCardProp
           >
             <Trash2 className="w-4 h-4 mr-1" />
             Delete
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="text-xs hover:bg-muted text-muted-foreground"
+            onClick={(e) => {
+              e.stopPropagation()
+              // Edit functionality
+            }}
+          >
+            <Edit2 className="w-4 h-4 mr-1" />
+            Edit
           </Button>
         </div>
       </div>

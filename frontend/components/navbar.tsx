@@ -2,61 +2,44 @@
 
 import Link from 'next/link'
 import { ShoppingCart, User, Search, Menu } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { useState, useEffect } from 'react'
-import { getCart } from '@/lib/cart'
+import { useState } from 'react'
+import { useCart } from '@/context/CartContext'
 import { useTranslation } from '@/lib/i18n'
 
 export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [cartCount, setCartCount] = useState(0)
+  const { totalItems } = useCart()
   const { t, lang, setLang } = useTranslation()
 
-  // Listen globally to the "cartUpdated" event dispatched exactly by our lib/cart.ts overrides
-  useEffect(() => {
-    // Initial fetch
-    setCartCount(getCart().reduce((acc, item) => acc + item.quantity, 0))
-
-    const handleCartUpdate = () => {
-      setCartCount(getCart().reduce((acc, item) => acc + item.quantity, 0))
-    }
-
-    window.addEventListener('cartUpdated', handleCartUpdate)
-    return () => window.removeEventListener('cartUpdated', handleCartUpdate)
-  }, [])
-
   return (
-    <nav className="sticky top-0 z-50 bg-background border-b border-border">
+    <nav className="sticky top-0 z-50 bg-background border-b border-border text-foreground">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <div className="">
+          <Link href="/" className="flex items-center">
             <h1 className="text-2xl font-bold text-primary">Artisan</h1>
-          </div>
+          </Link>
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-8">
-            <Link href="/" className="text-sm font-medium text-foreground hover:text-primary transition-colors">
+            <Link href="/" className="text-sm font-medium hover:text-primary transition-colors">
               Home
             </Link>
-            <Link href="/marketplace" className="text-sm font-medium text-foreground hover:text-primary transition-colors">
+            <Link href="/marketplace" className="text-sm font-medium hover:text-primary transition-colors">
               {t("marketplace")}
             </Link>
-            <Link href="/reels" className="text-sm font-medium text-foreground hover:text-primary transition-colors">
+            <Link href="/reels" className="text-sm font-medium hover:text-primary transition-colors">
               Reels
             </Link>
-            <Link href="/discover" className="text-sm font-medium text-foreground hover:text-primary transition-colors">
+            <Link href="/discover" className="text-sm font-medium hover:text-primary transition-colors">
               Discover
             </Link>
-            <Link href="/origin" className="text-sm font-medium text-foreground hover:text-primary transition-colors">
+            <Link href="/origin" className="text-sm font-medium hover:text-primary transition-colors">
               Origin
-            </Link>
-            <Link href="/cart" className="text-sm font-medium text-foreground hover:text-primary transition-colors">
-              {t("cart")}
             </Link>
           </div>
 
-          {/* Search Bar (Hidden on mobile) */}
+          {/* Search Bar */}
           <div className="hidden md:flex items-center flex-1 max-w-md mx-8">
             <div className="relative w-full">
               <input
@@ -78,26 +61,28 @@ export default function Navbar() {
               <option value="en">EN</option>
               <option value="hi">हिंदी</option>
             </select>
-            <Link href="/cart" className="p-2 hover:bg-secondary rounded-lg transition-colors relative">
-              <ShoppingCart className="w-5 h-5 text-foreground" />
-              {cartCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-primary text-white text-[10px] font-bold w-4 h-4 flex items-center justify-center rounded-full">
-                  {cartCount}
+
+            <Link href="/buyer/cart" className="p-2 hover:bg-secondary rounded-lg transition-colors relative" id="cart-icon">
+              <ShoppingCart className="w-5 h-5" />
+              {totalItems > 0 && (
+                <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-[10px] font-bold min-w-[1.25rem] h-5 flex items-center justify-center rounded-full px-1">
+                  {totalItems}
                 </span>
               )}
             </Link>
+
             <Link href="/login" className="p-2 hover:bg-secondary rounded-lg transition-colors">
-              <User className="w-5 h-5 text-foreground" />
+              <User className="w-5 h-5" />
             </Link>
           </div>
 
           {/* Mobile Menu Button */}
           <div className="md:hidden flex items-center gap-4">
-            <Link href="/cart" className="p-2 hover:bg-secondary rounded-lg transition-colors relative">
-              <ShoppingCart className="w-5 h-5 text-foreground" />
-              {cartCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-primary text-white text-[10px] font-bold w-4 h-4 flex items-center justify-center rounded-full">
-                  {cartCount}
+            <Link href="/buyer/cart" className="p-2 hover:bg-secondary rounded-lg transition-colors relative">
+              <ShoppingCart className="w-5 h-5" />
+              {totalItems > 0 && (
+                <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-[10px] font-bold min-w-[1.1rem] h-4.5 flex items-center justify-center rounded-full px-1">
+                  {totalItems}
                 </span>
               )}
             </Link>
@@ -105,7 +90,7 @@ export default function Navbar() {
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="p-2 hover:bg-secondary rounded-lg transition-colors"
             >
-              <Menu className="w-5 h-5 text-foreground" />
+              <Menu className="w-5 h-5" />
             </button>
           </div>
         </div>
@@ -118,23 +103,20 @@ export default function Navbar() {
               placeholder="Search products..."
               className="w-full px-4 py-2 rounded-lg bg-secondary border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
             />
-            <Link href="/" className="block text-sm font-medium text-foreground hover:text-primary transition-colors py-2">
+            <Link href="/" className="block text-sm font-medium hover:text-primary transition-colors py-2">
               Home
             </Link>
-            <Link href="/marketplace" className="block text-sm font-medium text-foreground hover:text-primary transition-colors py-2">
+            <Link href="/marketplace" className="block text-sm font-medium hover:text-primary transition-colors py-2">
               {t("marketplace")}
             </Link>
-            <Link href="/reels" className="block text-sm font-medium text-foreground hover:text-primary transition-colors py-2">
+            <Link href="/reels" className="block text-sm font-medium hover:text-primary transition-colors py-2">
               Reels
             </Link>
-            <Link href="/discover" className="block text-sm font-medium text-foreground hover:text-primary transition-colors py-2">
+            <Link href="/discover" className="block text-sm font-medium hover:text-primary transition-colors py-2">
               Discover
             </Link>
-            <Link href="/origin" className="block text-sm font-medium text-foreground hover:text-primary transition-colors py-2">
+            <Link href="/origin" className="block text-sm font-medium hover:text-primary transition-colors py-2">
               Origin
-            </Link>
-            <Link href="/cart" className="block text-sm font-medium text-foreground hover:text-primary transition-colors py-2">
-              {t("cart")}
             </Link>
             <div className="py-2">
               <select
@@ -146,7 +128,7 @@ export default function Navbar() {
                 <option value="hi">हिंदी</option>
               </select>
             </div>
-            <Link href="/login" className="flex items-center gap-2 text-sm font-medium text-foreground hover:text-primary transition-colors py-2">
+            <Link href="/login" className="flex items-center gap-2 text-sm font-medium hover:text-primary transition-colors py-2">
               <User className="w-4 h-4" /> Profile / Login
             </Link>
           </div>
