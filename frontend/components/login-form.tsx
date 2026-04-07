@@ -6,6 +6,9 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ChevronLeft } from "lucide-react"
+import { fetchApi, setAuthToken } from "@/lib/api"
+import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 
 interface LoginFormProps {
   method: "email" | "google"
@@ -16,13 +19,27 @@ export default function LoginForm({ method, onBack }: LoginFormProps) {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1500))
-    setIsLoading(false)
+
+    try {
+      const response = await fetchApi<{ access_token: string }>("/auth/login", {
+        data: { email, password },
+      })
+
+      setAuthToken(response.access_token)
+      toast.success("Welcome back!")
+
+      // Redirect to buyer page
+      router.push("/buyer")
+    } catch (error: any) {
+      toast.error(error.message || "Failed to log in")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   if (method === "google") {
