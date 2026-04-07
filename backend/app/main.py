@@ -10,10 +10,14 @@ from app.api.router import api_router
 # Setup logging
 setup_logging()
 
+from app.core.firebase import init_firebase
+
 def create_application() -> FastAPI:
     """
     Initialize and configure the FastAPI application.
     """
+    # Initialize Firebase Admin SDK
+    init_firebase()
     application = FastAPI(
         title=settings.PROJECT_NAME,
         openapi_url=f"{settings.API_V1_STR}/openapi.json",
@@ -23,10 +27,10 @@ def create_application() -> FastAPI:
     )
 
     # Set all CORS enabled origins
-    if settings.BACKEND_CORS_ORIGINS:
+    if settings.cors_origins:
         application.add_middleware(
             CORSMiddleware,
-            allow_origins=[str(origin) for origin in settings.BACKEND_CORS_ORIGINS],
+            allow_origins=settings.cors_origins,
             allow_credentials=True,
             allow_methods=["*"],
             allow_headers=["*"],
