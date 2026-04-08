@@ -19,15 +19,14 @@ export default function SellerCta() {
           <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
             <Button
               size="lg"
-              className="bg-white hover:bg-white/90 text-primary rounded-lg font-semibold group"
+              className="bg-white hover:bg-white/95 text-primary rounded-lg font-outfit font-bold uppercase tracking-wider text-sm transition-all hover:scale-105 active:scale-95 shadow-xl group border-none px-8"
             >
               Start Selling Your Craft
               <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
             </Button>
             <Button
-              variant="outline"
               size="lg"
-              className="border-white text-white hover:bg-white/10 rounded-lg font-semibold"
+              className="bg-white hover:bg-white/95 text-primary rounded-lg font-outfit font-bold uppercase tracking-wider text-sm transition-all hover:scale-105 active:scale-95 shadow-xl border-none px-8"
             >
               Learn More
             </Button>

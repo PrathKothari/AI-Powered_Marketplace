@@ -18,11 +18,10 @@ export default function HeroSection() {
               </p>
             </div>
 
-            {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row gap-4 pt-4">
               <Button
                 size="lg"
-                className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg font-semibold group"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg font-outfit font-bold uppercase tracking-wider group text-sm transition-all hover:scale-105 active:scale-95"
               >
                 Explore Products
                 <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
@@ -30,9 +29,9 @@ export default function HeroSection() {
               <Button
                 variant="outline"
                 size="lg"
-                className="border-primary text-primary hover:bg-primary/10 rounded-lg font-semibold"
+                className="border-primary text-primary hover:bg-primary hover:text-white rounded-lg font-outfit font-bold uppercase tracking-wider text-sm transition-all hover:scale-105 active:scale-95"
               >
-                Start Selling
+                Share Your Art
               </Button>
             </div>
           </div>
@@ -40,10 +39,10 @@ export default function HeroSection() {
           {/* Right Image */}
           <div className="relative h-96 md:h-full min-h-96">
             <Image
-              src="/handmade-hero.jpg"
-              alt="Handmade products"
+              src="https://firebasestorage.googleapis.com/v0/b/ai-market-asst-1.firebasestorage.app/o/dataset%2Fmadhubani%2Fmadhubani0.jpg?alt=media&token=770c03a1-9df2-43a8-a9c7-addb89ca132a"
+              alt="Hand-painted Madhubani Masterpiece"
               fill
-              className="object-cover rounded-xl shadow-xl"
+              className="object-cover rounded-xl shadow-2xl"
               priority
             />
           </div>

@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001/api/v1";
 
 interface FetchOptions extends RequestInit {
     data?: any;
@@ -64,5 +64,15 @@ export const getAuthToken = () => {
 export const removeAuthToken = () => {
     if (typeof window !== "undefined") {
         localStorage.removeItem("auth_token");
+    }
+};
+
+export const getCategories = async () => {
+    try {
+        const response = await fetchApi<any[]>('/categories');
+        return response;
+    } catch (error) {
+        console.error('Failed to fetch categories:', error);
+        return [];
     }
 };

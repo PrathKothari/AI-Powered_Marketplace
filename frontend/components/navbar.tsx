@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { ShoppingCart, User, Search, Menu } from 'lucide-react'
+import { ShoppingCart, User, Menu, Paintbrush } from 'lucide-react'
 import { useState } from 'react'
 import { useCart } from '@/context/CartContext'
 import { useTranslation } from '@/lib/i18n'
@@ -16,40 +16,31 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link href="/" className="flex items-center">
-            <h1 className="text-2xl font-bold text-primary">Artisan</h1>
+          <Link href="/" className="flex items-center gap-2">
+            <Paintbrush className="w-6 h-6 text-primary" />
+            <h1 className="text-2xl font-bold text-primary">KalaSetu</h1>
           </Link>
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-8">
-            <Link href="/" className="text-sm font-medium hover:text-primary transition-colors">
+            <Link href="/" className="text-sm font-outfit font-bold uppercase tracking-wider hover:text-primary transition-colors">
               Home
             </Link>
-            <Link href="/marketplace" className="text-sm font-medium hover:text-primary transition-colors">
+            <Link href="/marketplace" className="text-sm font-outfit font-bold uppercase tracking-wider hover:text-primary transition-colors">
               {t("marketplace")}
             </Link>
-            <Link href="/reels" className="text-sm font-medium hover:text-primary transition-colors">
+            <Link href="/reels" className="text-sm font-outfit font-bold uppercase tracking-wider hover:text-primary transition-colors">
               Reels
             </Link>
-            <Link href="/discover" className="text-sm font-medium hover:text-primary transition-colors">
+            <Link href="/discover" className="text-sm font-outfit font-bold uppercase tracking-wider hover:text-primary transition-colors">
               Discover
             </Link>
-            <Link href="/origin" className="text-sm font-medium hover:text-primary transition-colors">
+            <Link href="/origin" className="text-sm font-outfit font-bold uppercase tracking-wider hover:text-primary transition-colors">
               Origin
             </Link>
           </div>
 
-          {/* Search Bar */}
-          <div className="hidden md:flex items-center flex-1 max-w-md mx-8">
-            <div className="relative w-full">
-              <input
-                type="text"
-                placeholder="Search products..."
-                className="w-full px-4 py-2 rounded-lg bg-secondary border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-              />
-              <Search className="absolute right-3 top-2.5 w-4 h-4 text-muted-foreground" />
-            </div>
-          </div>
+
 
           {/* Desktop Icons */}
           <div className="hidden md:flex items-center gap-4">
@@ -98,11 +89,7 @@ export default function Navbar() {
         {/* Mobile Menu */}
         {mobileMenuOpen && (
           <div className="md:hidden pb-4 space-y-3">
-            <input
-              type="text"
-              placeholder="Search products..."
-              className="w-full px-4 py-2 rounded-lg bg-secondary border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-            />
+
             <Link href="/" className="block text-sm font-medium hover:text-primary transition-colors py-2">
               Home
             </Link>
