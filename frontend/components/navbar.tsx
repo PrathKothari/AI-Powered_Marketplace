@@ -1,15 +1,40 @@
 'use client'
 
 import Link from 'next/link'
-import { ShoppingCart, User, Menu, Paintbrush } from 'lucide-react'
-import { useState } from 'react'
+import { ShoppingCart, User, Menu, Paintbrush, LogOut, ChevronDown, LayoutDashboard, Plus, Package } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { useCart } from '@/context/CartContext'
 import { useTranslation } from '@/lib/i18n'
+import { useAuth } from '@/context/AuthContext'
+import { toast } from 'sonner'
 
 export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
   const { totalItems } = useCart()
   const { t, lang, setLang } = useTranslation()
+  const { user, logout } = useAuth()
+  const router = useRouter()
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  // Close user dropdown on outside click
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setUserMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  const handleLogout = async () => {
+    await logout()
+    toast.success('Signed out successfully')
+    router.push('/')
+    setUserMenuOpen(false)
+  }
 
   return (
     <nav className="sticky top-0 z-50 bg-background border-b border-border text-foreground">
@@ -62,9 +87,49 @@ export default function Navbar() {
               )}
             </Link>
 
-            <Link href="/login" className="p-2 hover:bg-secondary rounded-lg transition-colors">
-              <User className="w-5 h-5" />
-            </Link>
+            {user ? (
+              <div className="relative" ref={menuRef}>
+                <button
+                  onClick={() => setUserMenuOpen(!userMenuOpen)}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-secondary transition-colors"
+                >
+                  <div className="w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold uppercase">
+                    {user.name.charAt(0)}
+                  </div>
+                  <span className="text-sm font-medium hidden lg:block max-w-[100px] truncate">{user.name}</span>
+                  <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                </button>
+                {userMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-48 bg-card border border-border rounded-xl shadow-lg py-1 z-50">
+                    <div className="px-4 py-2 border-b border-border">
+                      <p className="text-xs font-semibold text-foreground truncate">{user.name}</p>
+                      <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                    </div>
+                    <Link href="/dashboard" className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-secondary transition-colors" onClick={() => setUserMenuOpen(false)}>
+                      <LayoutDashboard className="w-4 h-4" /> Dashboard
+                    </Link>
+                    <Link href="/orders" className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-secondary transition-colors" onClick={() => setUserMenuOpen(false)}>
+                      <Package className="w-4 h-4" /> My Orders
+                    </Link>
+                    <Link href="/sell" className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-secondary transition-colors" onClick={() => setUserMenuOpen(false)}>
+                      <Plus className="w-4 h-4" /> Sell a Painting
+                    </Link>
+                    <div className="border-t border-border mt-1" />
+                    <button
+                      onClick={handleLogout}
+                      className="w-full flex items-center gap-2 px-4 py-2 text-sm text-destructive hover:bg-destructive/5 transition-colors"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Sign Out
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <Link href="/login" className="p-2 hover:bg-secondary rounded-lg transition-colors">
+                <User className="w-5 h-5" />
+              </Link>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -115,9 +180,18 @@ export default function Navbar() {
                 <option value="hi">हिंदी</option>
               </select>
             </div>
-            <Link href="/login" className="flex items-center gap-2 text-sm font-medium hover:text-primary transition-colors py-2">
-              <User className="w-4 h-4" /> Profile / Login
-            </Link>
+            {user ? (
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-2 text-sm font-medium text-destructive hover:text-destructive/80 transition-colors py-2"
+              >
+                <LogOut className="w-4 h-4" /> Sign Out ({user.name})
+              </button>
+            ) : (
+              <Link href="/login" className="flex items-center gap-2 text-sm font-medium hover:text-primary transition-colors py-2">
+                <User className="w-4 h-4" /> Sign In / Register
+              </Link>
+            )}
           </div>
         )}
       </div>

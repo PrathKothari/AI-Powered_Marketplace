@@ -1,14 +1,14 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { getOrders, Order } from "@/lib/orders"
-import { 
-  Package, 
-  ChevronDown, 
-  ChevronUp, 
-  ArrowLeft, 
-  Calendar, 
-  CreditCard, 
+import { getOrders, Order } from "@/lib/api"
+import {
+  Package,
+  ChevronDown,
+  ChevronUp,
+  ArrowLeft,
+  Calendar,
+  CreditCard,
   ExternalLink,
   ShoppingBag
 } from "lucide-react"
@@ -20,9 +20,13 @@ import { Badge } from "@/components/ui/badge"
 export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([])
   const [expandedOrders, setExpandedOrders] = useState<string[]>([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    setOrders(getOrders())
+    getOrders().then(data => {
+      setOrders(data)
+      setLoading(false)
+    })
   }, [])
 
   const toggleExpand = (id: string) => {
@@ -42,6 +46,14 @@ export default function OrdersPage() {
       default:
         return <Badge variant="outline" className="px-3 py-1 scale-105">{status}</Badge>
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-[80vh] flex items-center justify-center">
+        <div className="w-10 h-10 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+      </div>
+    )
   }
 
   if (orders.length === 0) {
@@ -80,35 +92,35 @@ export default function OrdersPage() {
 
         <div className="space-y-6">
           {orders.map((order) => {
-            const isExpanded = expandedOrders.includes(order.id)
+            const key = order.orderId
+            const isExpanded = expandedOrders.includes(key)
             return (
-              <Card key={order.id} className="overflow-hidden border-slate-200/60 bg-white shadow-sm hover:shadow-md transition-all duration-300 rounded-2xl">
-                <div 
+              <Card key={key} className="overflow-hidden border-slate-200/60 bg-white shadow-sm hover:shadow-md transition-all duration-300 rounded-2xl">
+                <div
                   className="p-6 sm:p-8 cursor-pointer"
-                  onClick={() => toggleExpand(order.id)}
+                  onClick={() => toggleExpand(key)}
                 >
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
                     <div className="space-y-2">
                        <div className="flex items-center gap-3">
                          <span className="text-xs font-black uppercase tracking-widest text-primary/60 bg-primary/5 px-2 py-0.5 rounded">Order ID</span>
-                         <h2 className="text-lg font-mono font-bold text-slate-800">{order.id}</h2>
+                         <h2 className="text-lg font-mono font-bold text-slate-800">{order.orderId}</h2>
                        </div>
-                       
                        <div className="flex items-center gap-6 text-sm text-slate-500">
                           <div className="flex items-center gap-1.5 font-medium">
                             <Calendar className="w-4 h-4 opacity-70" />
-                            {new Date(order.date).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
+                            {new Date(order.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
                           </div>
                           <div className="flex items-center gap-1.5 font-bold text-slate-700">
                             <CreditCard className="w-4 h-4 opacity-70" />
-                            ${order.total.toFixed(2)}
+                            ₹{order.total.toFixed(0)}
                           </div>
                        </div>
                     </div>
 
                     <div className="flex items-center justify-between sm:justify-start gap-4">
                        {getStatusBadge(order.status)}
-                       <div className="p-1 px-2 rounded-lg bg-slate-50 text-slate-400 group-hover:text-primary transition-colors">
+                       <div className="p-1 px-2 rounded-lg bg-slate-50 text-slate-400">
                           {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
                        </div>
                     </div>
@@ -121,17 +133,17 @@ export default function OrdersPage() {
                     <div className="space-y-4">
                        {order.items.map((item, idx) => (
                          <div key={idx} className="flex items-center gap-6 bg-white p-4 rounded-xl border border-slate-100 shadow-sm transition hover:shadow-md">
-                            <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 border border-slate-50">
-                               <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                            <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 border border-slate-50 bg-slate-100">
+                               {item.image && <img src={item.image} alt={item.name} className="w-full h-full object-cover" />}
                             </div>
                             <div className="flex-1 min-w-0">
                                <div className="flex justify-between items-start">
                                   <h4 className="font-bold text-slate-800 truncate">{item.name}</h4>
-                                  <p className="text-sm font-black text-primary">${(item.price * item.quantity).toFixed(2)}</p>
+                                  <p className="text-sm font-black text-primary">₹{(item.price * item.quantity).toFixed(0)}</p>
                                </div>
                                <div className="flex justify-between mt-1 items-center">
                                   <p className="text-xs text-slate-400 font-medium tracking-wide">
-                                     Price: <span className="text-slate-600">${item.price.toFixed(2)}</span>
+                                     Price: <span className="text-slate-600">₹{item.price.toFixed(0)}</span>
                                   </p>
                                   <Badge className="bg-slate-100 text-slate-500 border-none font-bold text-[10px]">QTY: {item.quantity}</Badge>
                                </div>
@@ -139,14 +151,14 @@ export default function OrdersPage() {
                          </div>
                        ))}
                     </div>
-                    
+
                     <div className="pt-4 border-t border-dashed border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                        <p className="text-xs text-slate-400 max-w-xs leading-relaxed italic">
-                         Your transaction is securely recorded in our historical database. You can track shipping updates directly via the artisan studio dashboard.
+                         Your order is securely recorded. Track shipping updates via your artisan studio dashboard.
                        </p>
                        <Link href={`/product/${order.items[0]?.id}`}>
                           <Button variant="ghost" size="sm" className="text-primary hover:bg-primary/5 font-bold gap-2">
-                            View Original Craft <ExternalLink className="w-4 h-4" />
+                            View Painting <ExternalLink className="w-4 h-4" />
                           </Button>
                        </Link>
                     </div>

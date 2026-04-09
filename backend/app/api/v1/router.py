@@ -10,7 +10,10 @@ from app.api.v1.endpoints import (
     analytics,
     auth,
     ingest,
-    categories
+    categories,
+    reviews,
+    orders,
+    payments,
 )
 
 api_router = APIRouter()
@@ -26,3 +29,6 @@ api_router.include_router(users.router, prefix="/users", tags=["Users"])
 api_router.include_router(analytics.router, prefix="/analytics", tags=["Analytics"])
 api_router.include_router(ingest.router, prefix="/ingest", tags=["Ingest"])
 api_router.include_router(categories.router, prefix="/categories", tags=["Categories"])
+api_router.include_router(reviews.router, prefix="/reviews", tags=["Reviews"])
+api_router.include_router(orders.router, prefix="/orders", tags=["Orders"])
+api_router.include_router(payments.router, prefix="/payments", tags=["Payments"])

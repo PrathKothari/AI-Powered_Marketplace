@@ -7,9 +7,10 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
+import { toast } from 'sonner'
 import { useCart } from '@/context/CartContext'
 import { Product } from '@/lib/types/product'
-import { getProducts } from '@/lib/products'
+import { getCatalogProducts, getProductReviews, addProductReview } from '@/lib/api'
 import ProductCard from '@/components/product-card'
 
 export default function ProductPage() {
@@ -22,52 +23,72 @@ export default function ProductPage() {
 
   const [product, setProduct] = useState<Product | undefined>(undefined)
   const [allProducts, setAllProducts] = useState<Product[]>([])
+  const [loadingProduct, setLoadingProduct] = useState(true)
 
   // Reviews state
-  interface Review { name: string; rating: number; comment: string; }
+  interface Review { reviewId?: string; name: string; rating: number; comment: string; createdAt?: string; }
   const [reviews, setReviews] = useState<Review[]>([])
   const [newReviewName, setNewReviewName] = useState("")
   const [newReviewRating, setNewReviewRating] = useState(5)
   const [newReviewComment, setNewReviewComment] = useState("")
+  const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
-    const products = getProducts()
-    setAllProducts(products)
-    setProduct(products.find(p => String(p.id) === String(productId)))
+    getCatalogProducts().then((data) => {
+      const products: Product[] = data.map((doc: any) => ({
+        id: doc.productId ?? doc.id,
+        name: doc.title ?? doc.name ?? 'Untitled Painting',
+        price: doc.price ?? 0,
+        description: doc.description ?? '',
+        images: Array.isArray(doc.images) ? doc.images : [],
+        status: (() => {
+          if (!doc.active) return 'out-of-stock'
+          const s = doc.stock ?? 0
+          if (s === 0) return 'out-of-stock'
+          if (s <= 5) return 'low-stock'
+          return 'in-stock'
+        })(),
+        stock: doc.stock,
+        artisan: { name: doc.artisanId ?? 'Unknown Artisan', location: doc.region ?? '', avatar: '' },
+        category: doc.craftType ?? '',
+        rating: doc.rating ?? 0,
+        relatedProducts: [],
+      }))
+      setAllProducts(products)
+      setProduct(products.find(p => String(p.id) === String(productId)))
+      setLoadingProduct(false)
+    }).catch(() => setLoadingProduct(false))
 
-    // Load reviews dynamically from localStorage
-    const storageKey = `reviews-${productId}`
-    const stored = localStorage.getItem(storageKey)
-    if (stored) {
-      setReviews(JSON.parse(stored))
-    } else {
-      const initialMock = [
-        { name: "Rahul", rating: 5, comment: "Amazing quality!" },
-        { name: "Priya", rating: 4, comment: "Loved it" }
-      ]
-      setReviews(initialMock)
-      localStorage.setItem(storageKey, JSON.stringify(initialMock))
-    }
+    // Fetch reviews from backend
+    getProductReviews(productId).then(setReviews).catch(() => {})
   }, [productId])
 
-  const handleReviewSubmit = (e: React.FormEvent) => {
+  const handleReviewSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!newReviewName || !newReviewComment) return
-
-    const storageKey = `reviews-${productId}`
-    const newReview = { name: newReviewName, rating: newReviewRating, comment: newReviewComment }
-    const updated = [newReview, ...reviews]
-    setReviews(updated)
-    localStorage.setItem(storageKey, JSON.stringify(updated))
-
-    // Reset form
-    setNewReviewName("")
-    setNewReviewRating(5)
-    setNewReviewComment("")
+    if (!newReviewName || !newReviewComment || submitting) return
+    setSubmitting(true)
+    try {
+      const saved = await addProductReview(productId, {
+        name: newReviewName,
+        rating: newReviewRating,
+        comment: newReviewComment,
+      })
+      setReviews((prev) => [saved, ...prev])
+      setNewReviewName("")
+      setNewReviewRating(5)
+      setNewReviewComment("")
+      toast.success('Review posted successfully!')
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to post review. Please try again.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
-  const averageRating = reviews.length > 0 
+  const averageRating = reviews.length > 0
     ? (reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length).toFixed(1)
+    : (product?.rating ?? 0) > 0
+    ? (product!.rating!).toFixed(1)
     : "0.0"
 
   const relatedProducts = useMemo<Product[]>(() => {
@@ -105,6 +126,14 @@ export default function ProductPage() {
     router.push('/buyer/cart')
   }
 
+  if (loadingProduct) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="w-12 h-12 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+      </div>
+    )
+  }
+
   if (!product) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -132,7 +161,7 @@ export default function ProductPage() {
           <div className="lg:col-span-2 space-y-6">
             <div className="rounded-xl bg-white p-5 shadow-sm border border-border">
               <h1 className="text-3xl font-bold mb-3">{product.name}</h1>
-              <p className="text-lg font-semibold text-indigo-600 mb-2">${product.price.toFixed(2)}</p>
+              <p className="text-lg font-semibold text-primary mb-2">₹{product.price.toFixed(0)}</p>
               <p className="text-sm text-muted-foreground mb-4">{product.description}</p>
 
               {/* Artisan Info */}
@@ -227,7 +256,9 @@ export default function ProductPage() {
                   onChange={(e) => setNewReviewComment(e.target.value)}
                   className="w-full p-3 border border-slate-200 rounded-lg focus:outline-primary transition-all h-24 resize-none text-sm"
                 />
-                <Button type="submit" className="px-6 font-bold">Post Review</Button>
+                <Button type="submit" className="px-6 font-bold" disabled={submitting}>
+                  {submitting ? 'Posting...' : 'Post Review'}
+                </Button>
               </form>
 
               {/* Reviews List */}
@@ -286,7 +317,15 @@ export default function ProductPage() {
                 <Button className="w-full" onClick={handleAddToCart}>
                   <ShoppingCart className="w-4 h-4 mr-2" /> Add to Cart
                 </Button>
-                <Button className="w-full" variant="secondary" onClick={() => router.push('/cart')}>
+                <Button
+                  className="w-full"
+                  variant="secondary"
+                  onClick={() => {
+                    if (!product) return
+                    addToCart({ id: product.id, name: product.name, price: product.price, image: product.images?.[0] ?? '' })
+                    router.push('/buyer/cart')
+                  }}
+                >
                   Buy Now
                 </Button>
               </div>

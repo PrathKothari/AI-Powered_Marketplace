@@ -15,4 +15,5 @@ export type Product = {
   rating?: number
   relatedProducts?: string[]
   sold?: number
+  stock?: number
 }
