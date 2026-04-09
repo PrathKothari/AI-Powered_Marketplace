@@ -22,8 +22,9 @@ def create_application() -> FastAPI:
         title=settings.PROJECT_NAME,
         openapi_url=f"{settings.API_V1_STR}/openapi.json",
         docs_url=f"{settings.API_V1_STR}/docs",  # e.g. /api/v1/docs
-        description="Backend for AI-Powered Artisan Marketplace",
+        description="Backend for KalaSetu Marketplace",
         version="0.1.0",
+        redirect_slashes=False,
     )
 
     # Set all CORS enabled origins

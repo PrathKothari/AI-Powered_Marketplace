@@ -56,6 +56,13 @@ class Settings(BaseSettings):
     FIREBASE_API_KEY: Optional[str] = None
     FIREBASE_STORAGE_BUCKET: str = ""
 
+    # Google OAuth
+    GOOGLE_CLIENT_ID: Optional[str] = None
+
+    # Email (Gmail SMTP)
+    EMAIL_SENDER: Optional[str] = None      # your Gmail address
+    EMAIL_PASSWORD: Optional[str] = None    # Gmail App Password (not your login password)
+
     # AI/ML
     ML_MODEL_PATH: str = "./app/ml/models"
 
@@ -69,6 +76,10 @@ class Settings(BaseSettings):
     PINECONE_IMAGE_INDEX: str = "product-images"
     PINECONE_TEXT_INDEX: str = "product-text"
 
-    model_config = SettingsConfigDict(case_sensitive=True, env_file=".env", env_file_encoding='utf-8')
+    # Razorpay
+    RAZORPAY_KEY_ID: str = ""
+    RAZORPAY_KEY_SECRET: str = ""
+
+    model_config = SettingsConfigDict(case_sensitive=True, env_file=".env", env_file_encoding='utf-8', extra='ignore')
 
 settings = Settings()

@@ -24,32 +24,8 @@ export default function Home() {
       <main>
         <HeroSection />
 
-        {/* 🔥 Unified Logic */}
-        <div className="flex justify-center gap-6 py-10">
-          <button
-            onClick={() => router.push('/marketplace')}
-            className="bg-primary text-white px-6 py-3 rounded-lg hover:bg-primary/90 transition-colors"
-          >
-            Explore Marketplace
-          </button>
-
-          <button
-            onClick={() => router.push('/register?role=artisan')}
-            className="border px-6 py-3 rounded-lg hover:bg-slate-50 transition-colors"
-          >
-            Start Selling
-          </button>
-
-          <button
-            onClick={() => router.push('/login')}
-            className="border px-6 py-3 rounded-lg hover:bg-slate-50 transition-colors"
-          >
-            Login
-          </button>
-        </div>
 
         <CategoriesGrid />
-        <ProductsGrid />
         <WhyChooseUs />
         <SellerCTA />
       </main>

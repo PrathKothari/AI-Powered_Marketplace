@@ -81,3 +81,13 @@ class MediaAssetBase(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+class CategoryBase(BaseModel):
+    categoryId: Optional[str] = None
+    name: str
+    description: Optional[str] = ""
+    imageUrl: Optional[str] = ""
+    gradientTheme: Optional[str] = "from-purple-100 to-indigo-100"
+    createdAt: datetime = Field(default_factory=datetime.utcnow)
+    active: bool = True
+
+    model_config = ConfigDict(from_attributes=True, extra="ignore")

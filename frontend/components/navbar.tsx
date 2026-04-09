@@ -1,55 +1,71 @@
 'use client'
 
 import Link from 'next/link'
-import { ShoppingCart, User, Search, Menu } from 'lucide-react'
-import { useState } from 'react'
+import { ShoppingCart, User, Menu, Paintbrush, LogOut, ChevronDown, LayoutDashboard, Plus, Package } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { useCart } from '@/context/CartContext'
 import { useTranslation } from '@/lib/i18n'
+import { useAuth } from '@/context/AuthContext'
+import { toast } from 'sonner'
 
 export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
   const { totalItems } = useCart()
   const { t, lang, setLang } = useTranslation()
+  const { user, logout } = useAuth()
+  const router = useRouter()
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  // Close user dropdown on outside click
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setUserMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  const handleLogout = async () => {
+    await logout()
+    toast.success('Signed out successfully')
+    router.push('/')
+    setUserMenuOpen(false)
+  }
 
   return (
     <nav className="sticky top-0 z-50 bg-background border-b border-border text-foreground">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link href="/" className="flex items-center">
-            <h1 className="text-2xl font-bold text-primary">Artisan</h1>
+          <Link href="/" className="flex items-center gap-2">
+            <Paintbrush className="w-6 h-6 text-primary" />
+            <h1 className="text-2xl font-bold text-primary">KalaSetu</h1>
           </Link>
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-8">
-            <Link href="/" className="text-sm font-medium hover:text-primary transition-colors">
+            <Link href="/" className="text-sm font-outfit font-bold uppercase tracking-wider hover:text-primary transition-colors">
               Home
             </Link>
-            <Link href="/marketplace" className="text-sm font-medium hover:text-primary transition-colors">
+            <Link href="/marketplace" className="text-sm font-outfit font-bold uppercase tracking-wider hover:text-primary transition-colors">
               {t("marketplace")}
             </Link>
-            <Link href="/reels" className="text-sm font-medium hover:text-primary transition-colors">
+            <Link href="/reels" className="text-sm font-outfit font-bold uppercase tracking-wider hover:text-primary transition-colors">
               Reels
             </Link>
-            <Link href="/discover" className="text-sm font-medium hover:text-primary transition-colors">
+            <Link href="/discover" className="text-sm font-outfit font-bold uppercase tracking-wider hover:text-primary transition-colors">
               Discover
             </Link>
-            <Link href="/origin" className="text-sm font-medium hover:text-primary transition-colors">
+            <Link href="/origin" className="text-sm font-outfit font-bold uppercase tracking-wider hover:text-primary transition-colors">
               Origin
             </Link>
           </div>
 
-          {/* Search Bar */}
-          <div className="hidden md:flex items-center flex-1 max-w-md mx-8">
-            <div className="relative w-full">
-              <input
-                type="text"
-                placeholder="Search products..."
-                className="w-full px-4 py-2 rounded-lg bg-secondary border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-              />
-              <Search className="absolute right-3 top-2.5 w-4 h-4 text-muted-foreground" />
-            </div>
-          </div>
+
 
           {/* Desktop Icons */}
           <div className="hidden md:flex items-center gap-4">
@@ -71,9 +87,49 @@ export default function Navbar() {
               )}
             </Link>
 
-            <Link href="/login" className="p-2 hover:bg-secondary rounded-lg transition-colors">
-              <User className="w-5 h-5" />
-            </Link>
+            {user ? (
+              <div className="relative" ref={menuRef}>
+                <button
+                  onClick={() => setUserMenuOpen(!userMenuOpen)}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-secondary transition-colors"
+                >
+                  <div className="w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold uppercase">
+                    {user.name.charAt(0)}
+                  </div>
+                  <span className="text-sm font-medium hidden lg:block max-w-[100px] truncate">{user.name}</span>
+                  <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                </button>
+                {userMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-48 bg-card border border-border rounded-xl shadow-lg py-1 z-50">
+                    <div className="px-4 py-2 border-b border-border">
+                      <p className="text-xs font-semibold text-foreground truncate">{user.name}</p>
+                      <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                    </div>
+                    <Link href="/dashboard" className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-secondary transition-colors" onClick={() => setUserMenuOpen(false)}>
+                      <LayoutDashboard className="w-4 h-4" /> Dashboard
+                    </Link>
+                    <Link href="/orders" className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-secondary transition-colors" onClick={() => setUserMenuOpen(false)}>
+                      <Package className="w-4 h-4" /> My Orders
+                    </Link>
+                    <Link href="/sell" className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-secondary transition-colors" onClick={() => setUserMenuOpen(false)}>
+                      <Plus className="w-4 h-4" /> Sell a Painting
+                    </Link>
+                    <div className="border-t border-border mt-1" />
+                    <button
+                      onClick={handleLogout}
+                      className="w-full flex items-center gap-2 px-4 py-2 text-sm text-destructive hover:bg-destructive/5 transition-colors"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Sign Out
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <Link href="/login" className="p-2 hover:bg-secondary rounded-lg transition-colors">
+                <User className="w-5 h-5" />
+              </Link>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -98,11 +154,7 @@ export default function Navbar() {
         {/* Mobile Menu */}
         {mobileMenuOpen && (
           <div className="md:hidden pb-4 space-y-3">
-            <input
-              type="text"
-              placeholder="Search products..."
-              className="w-full px-4 py-2 rounded-lg bg-secondary border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-            />
+
             <Link href="/" className="block text-sm font-medium hover:text-primary transition-colors py-2">
               Home
             </Link>
@@ -128,9 +180,18 @@ export default function Navbar() {
                 <option value="hi">हिंदी</option>
               </select>
             </div>
-            <Link href="/login" className="flex items-center gap-2 text-sm font-medium hover:text-primary transition-colors py-2">
-              <User className="w-4 h-4" /> Profile / Login
-            </Link>
+            {user ? (
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-2 text-sm font-medium text-destructive hover:text-destructive/80 transition-colors py-2"
+              >
+                <LogOut className="w-4 h-4" /> Sign Out ({user.name})
+              </button>
+            ) : (
+              <Link href="/login" className="flex items-center gap-2 text-sm font-medium hover:text-primary transition-colors py-2">
+                <User className="w-4 h-4" /> Sign In / Register
+              </Link>
+            )}
           </div>
         )}
       </div>

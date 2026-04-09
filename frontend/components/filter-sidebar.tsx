@@ -12,24 +12,16 @@ interface FilterState {
 }
 
 interface FilterSidebarProps {
+  categories?: string[];
   onFilterChange?: (filters: FilterState) => void;
 }
 
-const CATEGORIES = [
-  'Electronics',
-  'Fashion',
-  'Home & Garden',
-  'Sports',
-  'Books',
-  'Beauty',
-];
-
 const RATINGS = ['4★ & above', '3★ & above', '2★ & above', '1★ & above'];
 
-export default function FilterSidebar({ onFilterChange }: FilterSidebarProps) {
+export default function FilterSidebar({ categories = [], onFilterChange }: FilterSidebarProps) {
   const [filters, setFilters] = useState<FilterState>({
     categories: [],
-    priceRange: [0, 1000],
+    priceRange: [0, 2000],
     availability: [],
     rating: 0,
   });
@@ -95,15 +87,19 @@ export default function FilterSidebar({ onFilterChange }: FilterSidebarProps) {
           </button>
           {expandedSections.categories && (
             <div className="space-y-2 pl-2">
-              {CATEGORIES.map((category) => (
-                <label key={category} className="flex items-center gap-3 cursor-pointer">
-                  <Checkbox
-                    checked={filters.categories.includes(category)}
-                    onCheckedChange={() => handleCategoryChange(category)}
-                  />
-                  <span className="text-sm text-gray-700">{category}</span>
-                </label>
-              ))}
+              {categories.length === 0 ? (
+                <p className="text-sm text-gray-400 italic">Loading...</p>
+              ) : (
+                categories.map((category) => (
+                  <label key={category} className="flex items-center gap-3 cursor-pointer">
+                    <Checkbox
+                      checked={filters.categories.includes(category)}
+                      onCheckedChange={() => handleCategoryChange(category)}
+                    />
+                    <span className="text-sm text-gray-700">{category}</span>
+                  </label>
+                ))
+              )}
             </div>
           )}
         </div>
@@ -120,22 +116,24 @@ export default function FilterSidebar({ onFilterChange }: FilterSidebarProps) {
           {expandedSections.price && (
             <div className="space-y-3 pl-2">
               <div>
-                <label className="text-xs text-gray-600">Min: ${filters.priceRange[0]}</label>
+                <label className="text-xs text-gray-600">Min: ₹{filters.priceRange[0]}</label>
                 <input
                   type="range"
                   min="0"
-                  max="1000"
+                  max="2000"
+                  step="50"
                   value={filters.priceRange[0]}
                   onChange={(e) => handlePriceChange(e, 0)}
                   className="w-full"
                 />
               </div>
               <div>
-                <label className="text-xs text-gray-600">Max: ${filters.priceRange[1]}</label>
+                <label className="text-xs text-gray-600">Max: ₹{filters.priceRange[1]}</label>
                 <input
                   type="range"
                   min="0"
-                  max="1000"
+                  max="2000"
+                  step="50"
                   value={filters.priceRange[1]}
                   onChange={(e) => handlePriceChange(e, 1)}
                   className="w-full"

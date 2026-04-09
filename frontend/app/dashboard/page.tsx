@@ -2,41 +2,38 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { getUser, User } from '@/lib/auth'
+import { useAuth } from '@/context/AuthContext'
+import { getOrders, getMyListings, Order } from '@/lib/api'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { LogOut, Package, Star, TrendingUp, CreditCard, ShoppingBag, BarChart3, ChevronRight } from 'lucide-react'
-import { getOrders, Order } from '@/lib/orders'
-import { getProducts } from '@/lib/products'
-import { Product } from '@/lib/types/product'
+import Link from 'next/link'
+import {
+  Package, Star, TrendingUp, CreditCard, ShoppingBag,
+  BarChart3, ChevronRight, Plus, Paintbrush,
+} from 'lucide-react'
 
 export default function DashboardPage() {
   const router = useRouter()
-  const [user, setUser] = useState<User | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  
-  // Real data state
+  const { user, loading } = useAuth()
+
   const [orders, setOrders] = useState<Order[]>([])
-  const [products, setProducts] = useState<Product[]>([])
+  const [listings, setListings] = useState<any[]>([])
+  const [dataLoading, setDataLoading] = useState(true)
 
   useEffect(() => {
-    const currentUser = getUser()
-    if (!currentUser) {
-      router.push('/login')
-    } else {
-      setUser(currentUser)
-      setOrders(getOrders())
-      setProducts(getProducts())
-      setIsLoading(false)
-    }
-  }, [router])
+    if (!loading && !user) router.push('/login')
+  }, [user, loading, router])
 
-  const handleLogout = () => {
-    localStorage.removeItem('user')
-    router.push('/login')
-  }
+  useEffect(() => {
+    if (!user) return
+    Promise.all([getOrders(), getMyListings()]).then(([o, l]) => {
+      setOrders(o)
+      setListings(l)
+      setDataLoading(false)
+    })
+  }, [user])
 
-  if (isLoading || !user) {
+  if (loading || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
@@ -44,253 +41,170 @@ export default function DashboardPage() {
     )
   }
 
-  // Derived Buyer Stats
   const totalSpending = orders.reduce((sum, o) => sum + o.total, 0)
-  const totalItemsPurchased = orders.reduce((sum, o) => sum + o.items.reduce((iSum, item) => iSum + item.quantity, 0), 0)
-
-  // Derived Artisan Stats
-  const artisanProducts = products // In a real app we'd filter by artisan ID
-  const totalSalesCount = artisanProducts.reduce((sum, p) => sum + (p.sales || 0), 0)
-  const totalRevenue = artisanProducts.reduce((sum, p) => sum + ((p.sales || 0) * (p.price || 0)), 0)
-  const avgRating = artisanProducts.length > 0 
-    ? artisanProducts.reduce((sum, p) => sum + (p.rating || 0), 0) / artisanProducts.length 
+  const totalItemsPurchased = orders.reduce((sum, o) => sum + o.items.reduce((s, i) => s + i.quantity, 0), 0)
+  const avgRating = listings.length > 0
+    ? listings.reduce((sum, p) => sum + (p.rating ?? 0), 0) / listings.length
     : 0
-
-  // --- Profile Card Fragment ---
-  const ProfileSummary = () => (
-    <Card className="rounded-xl p-6 shadow-sm border-border bg-white mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
-      <div className="flex items-center gap-4">
-        <div className="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center text-2xl font-bold uppercase ring-4 ring-primary/5">
-          {user.name.charAt(0)}
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800">Welcome back, {user.name}</h1>
-          <p className="text-slate-500 capitalize font-medium flex items-center gap-2">
-            {user.role} Account
-            <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
-          </p>
-        </div>
-      </div>
-      
-      <div className="flex gap-3">
-        {user.role === 'artisan' && (
-          <Button onClick={() => router.push('/sell')} className="bg-primary hover:bg-primary/90 text-white shadow-sm">
-            <Package className="w-4 h-4 mr-2" />
-            Sell Product
-          </Button>
-        )}
-        <Button onClick={() => router.push('/marketplace')} variant="outline" className="border-slate-200">
-          <ShoppingBag className="w-4 h-4 mr-2" />
-          Marketplace
-        </Button>
-      </div>
-    </Card>
-  )
-
-  // --- Buyer Dashboard Render ---
-  const renderBuyerDashboard = () => (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="p-6 rounded-xl shadow-sm border-border bg-white flex flex-col justify-center">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-blue-50 text-blue-600 rounded-lg">
-              <Package className="w-6 h-6" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-slate-500">Total Orders</p>
-              <h3 className="text-2xl font-bold text-slate-800">{orders.length}</h3>
-            </div>
-          </div>
-        </Card>
-        
-        <Card className="p-6 rounded-xl shadow-sm border-border bg-white flex flex-col justify-center">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-green-50 text-green-600 rounded-lg">
-              <CreditCard className="w-6 h-6" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-slate-500">Total Spending</p>
-              <h3 className="text-2xl font-bold text-slate-800">${totalSpending.toFixed(2)}</h3>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-6 rounded-xl shadow-sm border-border bg-white flex flex-col justify-center">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-purple-50 text-purple-600 rounded-lg">
-              <ShoppingBag className="w-6 h-6" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-slate-500">Items Purchased</p>
-              <h3 className="text-2xl font-bold text-slate-800">{totalItemsPurchased}</h3>
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      <Card className="rounded-xl shadow-sm border-border bg-white overflow-hidden">
-        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-slate-800">Recent Orders</h2>
-          <Button variant="ghost" size="sm" onClick={() => router.push('/orders')} className="text-primary hover:text-primary/80">View All</Button>
-        </div>
-        <div className="divide-y divide-slate-100">
-          {orders.slice(0, 5).map((order) => (
-            <div key={order.id} onClick={() => router.push('/orders')} className="p-6 flex items-center justify-between hover:bg-slate-50 transition-colors group cursor-pointer">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-lg bg-primary/5 flex items-center justify-center text-primary">
-                  <Package className="w-6 h-6" />
-                </div>
-                <div>
-                  <h4 className="font-semibold text-slate-800">Order {order.id.slice(0, 10)}...</h4>
-                  <p className="text-sm text-slate-500">Placed on {new Date(order.date).toLocaleDateString()}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-4">
-                <span className="font-bold text-slate-800">${order.total.toFixed(2)}</span>
-                <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-primary transition-colors" />
-              </div>
-            </div>
-          ))}
-          {orders.length === 0 && (
-            <div className="p-12 text-center text-slate-400 font-medium italic">
-              No orders found.
-            </div>
-          )}
-        </div>
-      </Card>
-    </div>
-  )
-
-  // --- Artisan Dashboard Render ---
-  const renderArtisanDashboard = () => (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="p-6 rounded-xl shadow-sm border-border bg-white">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-2 bg-orange-50 text-orange-600 rounded-lg">
-              <Package className="w-5 h-5" />
-            </div>
-            <span className="text-xs font-semibold text-green-600 bg-green-50 px-2 py-1 rounded-full">Inventory</span>
-          </div>
-          <p className="text-sm font-medium text-slate-500">Total Products</p>
-          <h3 className="text-2xl font-bold text-slate-800">{artisanProducts.length}</h3>
-        </Card>
-
-        <Card className="p-6 rounded-xl shadow-sm border-border bg-white">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
-              <TrendingUp className="w-5 h-5" />
-            </div>
-            <span className="text-xs font-semibold text-green-600 bg-green-50 px-2 py-1 rounded-full">Volume</span>
-          </div>
-          <p className="text-sm font-medium text-slate-500">Total Units Sold</p>
-          <h3 className="text-2xl font-bold text-slate-800">{totalSalesCount}</h3>
-        </Card>
-
-        <Card className="p-6 rounded-xl shadow-sm border-border bg-white">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-2 bg-yellow-50 text-yellow-600 rounded-lg">
-              <Star className="w-5 h-5" />
-            </div>
-            <span className="text-xs font-semibold text-slate-500 bg-slate-50 px-2 py-1 rounded-full">Customer Love</span>
-          </div>
-          <p className="text-sm font-medium text-slate-500">Average Rating</p>
-          <h3 className="text-2xl font-bold text-slate-800 flex items-center gap-1">
-            {avgRating.toFixed(1)}<Star className="w-5 h-5 fill-yellow-400 text-yellow-500 inline -mt-1" />
-          </h3>
-        </Card>
-
-        <Card className="p-6 rounded-xl shadow-sm border-border bg-white">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
-              <BarChart3 className="w-5 h-5" />
-            </div>
-            <span className="text-xs font-semibold text-green-600 bg-green-50 px-2 py-1 rounded-full">Total Earned</span>
-          </div>
-          <p className="text-sm font-medium text-slate-500">Total Revenue</p>
-          <h3 className="text-2xl font-bold text-emerald-600">${totalRevenue.toLocaleString()}</h3>
-        </Card>
-      </div>
-
-      <Card className="rounded-xl shadow-sm border-border bg-white overflow-hidden">
-        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-slate-800">Product Performance</h2>
-          <Button variant="outline" size="sm" onClick={() => router.push('/artisan/inventory')} className="hidden sm:flex border-slate-200">Manage Inventory</Button>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-50/50 border-b border-slate-100 hidden sm:table-row">
-                <th className="p-4 font-semibold text-sm text-slate-500 whitespace-nowrap">Product Name</th>
-                <th className="p-4 font-semibold text-sm text-slate-500 whitespace-nowrap hidden md:table-cell">Rating</th>
-                <th className="p-4 font-semibold text-sm text-slate-500 whitespace-nowrap">Sale Volume</th>
-                <th className="p-4 font-semibold text-sm text-slate-500 whitespace-nowrap text-right">Performance</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {artisanProducts.slice(0, 10).map((p) => {
-                const maxSales = Math.max(...artisanProducts.map(mp => mp.sales || 0), 1)
-                const progressWidth = Math.round(((p.sales || 0) / maxSales) * 100)
-                
-                return (
-                  <tr key={p.id} className="hover:bg-slate-50/50 flex flex-col sm:table-row p-4 sm:p-0">
-                    <td className="sm:p-4 py-2">
-                       <h4 className="font-semibold text-slate-800">{p.name || p.title}</h4>
-                       <span className="text-xs text-slate-500 sm:hidden mt-1 flex items-center gap-1">
-                          Sales: {p.sales} • <Star className="w-3 h-3 fill-yellow-400 text-yellow-500" /> {p.rating}
-                       </span>
-                    </td>
-                    <td className="p-4 hidden md:table-cell">
-                      <div className="flex items-center gap-1 text-slate-700 font-medium">
-                        <Star className="w-4 h-4 fill-yellow-400 text-yellow-500" /> {p.rating?.toFixed(1) || '0.0'}
-                      </div>
-                    </td>
-                    <td className="sm:p-4 py-1 hidden sm:table-cell">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full font-medium text-xs bg-blue-50 text-blue-700 border border-blue-100">
-                        {p.sales || 0} sales
-                      </span>
-                    </td>
-                    <td className="sm:p-4 py-2 sm:text-right align-middle w-full sm:w-48">
-                      <div className="flex items-center gap-3 w-full justify-end">
-                        <span className="text-xs text-slate-500 hidden sm:inline-block w-8">{progressWidth}%</span>
-                        <div className="h-2 w-full sm:w-24 bg-slate-100 rounded-full overflow-hidden flex-shrink-0">
-                          <div 
-                            className={`h-full rounded-full ${progressWidth > 70 ? 'bg-emerald-500' : progressWidth > 40 ? 'bg-blue-500' : 'bg-slate-400'}`} 
-                            style={{ width: `${progressWidth}%` }}
-                          />
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-              {artisanProducts.length === 0 && (
-                <tr>
-                   <td colSpan={4} className="p-12 text-center text-slate-400 font-medium italic">
-                      No products listed yet.
-                   </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-    </div>
-  )
+  const totalReviews = listings.reduce((sum, p) => sum + (p.reviewCount ?? 0), 0)
 
   return (
     <main className="min-h-screen bg-slate-50 p-4 md:p-8 lg:px-12 pb-24">
-      <div className="max-w-6xl mx-auto">
-        <div className="flex justify-end mb-4">
-          <Button variant="ghost" size="sm" onClick={handleLogout} className="text-slate-500 hover:text-red-500 hover:bg-red-50">
-            <LogOut className="w-4 h-4 mr-2" />
-            Sign Out
-          </Button>
-        </div>
-        
-        <ProfileSummary />
-        
-        {user.role === 'buyer' ? renderBuyerDashboard() : renderArtisanDashboard()}
+      <div className="max-w-6xl mx-auto space-y-8">
+
+        {/* Profile */}
+        <Card className="rounded-xl p-6 shadow-sm bg-white flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center text-2xl font-bold uppercase ring-4 ring-primary/5">
+              {user.name.charAt(0)}
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-slate-800">Welcome back, {user.name}</h1>
+              <p className="text-slate-500 text-sm">{user.email}</p>
+            </div>
+          </div>
+          <div className="flex gap-3 flex-wrap">
+            <Button onClick={() => router.push('/sell')} className="gap-2">
+              <Plus className="w-4 h-4" /> List a Painting
+            </Button>
+            <Button onClick={() => router.push('/marketplace')} variant="outline" className="gap-2">
+              <ShoppingBag className="w-4 h-4" /> Marketplace
+            </Button>
+          </div>
+        </Card>
+
+        {/* ── BUY SECTION ── */}
+        <section>
+          <h2 className="text-lg font-bold text-slate-700 mb-4 flex items-center gap-2">
+            <ShoppingBag className="w-5 h-5 text-primary" /> My Purchases
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card className="p-6 bg-white shadow-sm flex items-center gap-4">
+              <div className="p-3 bg-blue-50 text-blue-600 rounded-lg"><Package className="w-5 h-5" /></div>
+              <div>
+                <p className="text-sm text-slate-500">Total Orders</p>
+                <h3 className="text-2xl font-bold text-slate-800">{orders.length}</h3>
+              </div>
+            </Card>
+            <Card className="p-6 bg-white shadow-sm flex items-center gap-4">
+              <div className="p-3 bg-green-50 text-green-600 rounded-lg"><CreditCard className="w-5 h-5" /></div>
+              <div>
+                <p className="text-sm text-slate-500">Total Spent</p>
+                <h3 className="text-2xl font-bold text-slate-800">₹{totalSpending.toFixed(0)}</h3>
+              </div>
+            </Card>
+            <Card className="p-6 bg-white shadow-sm flex items-center gap-4">
+              <div className="p-3 bg-purple-50 text-purple-600 rounded-lg"><ShoppingBag className="w-5 h-5" /></div>
+              <div>
+                <p className="text-sm text-slate-500">Items Bought</p>
+                <h3 className="text-2xl font-bold text-slate-800">{totalItemsPurchased}</h3>
+              </div>
+            </Card>
+          </div>
+
+          <Card className="mt-4 bg-white shadow-sm overflow-hidden">
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="font-bold text-slate-800">Recent Orders</h3>
+              <Button variant="ghost" size="sm" onClick={() => router.push('/orders')} className="text-primary">View All</Button>
+            </div>
+            <div className="divide-y divide-slate-50">
+              {orders.slice(0, 4).map((order) => (
+                <div key={order.orderId} onClick={() => router.push('/orders')} className="p-5 flex items-center justify-between hover:bg-slate-50 cursor-pointer group">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-primary/5 flex items-center justify-center text-primary">
+                      <Package className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-slate-800 text-sm">{order.orderId}</p>
+                      <p className="text-xs text-slate-500">{new Date(order.createdAt).toLocaleDateString()}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="font-bold text-slate-800">₹{order.total.toFixed(0)}</span>
+                    <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-primary" />
+                  </div>
+                </div>
+              ))}
+              {orders.length === 0 && (
+                <div className="p-10 text-center text-slate-400 italic text-sm">
+                  No orders yet.{' '}
+                  <Link href="/marketplace" className="text-primary hover:underline">Start shopping</Link>
+                </div>
+              )}
+            </div>
+          </Card>
+        </section>
+
+        {/* ── SELL SECTION ── */}
+        <section>
+          <h2 className="text-lg font-bold text-slate-700 mb-4 flex items-center gap-2">
+            <Paintbrush className="w-5 h-5 text-primary" /> My Listings
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card className="p-6 bg-white shadow-sm flex items-center gap-4">
+              <div className="p-3 bg-orange-50 text-orange-600 rounded-lg"><Package className="w-5 h-5" /></div>
+              <div>
+                <p className="text-sm text-slate-500">Paintings Listed</p>
+                <h3 className="text-2xl font-bold text-slate-800">{listings.length}</h3>
+              </div>
+            </Card>
+            <Card className="p-6 bg-white shadow-sm flex items-center gap-4">
+              <div className="p-3 bg-yellow-50 text-yellow-600 rounded-lg"><Star className="w-5 h-5" /></div>
+              <div>
+                <p className="text-sm text-slate-500">Avg Rating</p>
+                <h3 className="text-2xl font-bold text-slate-800">{avgRating > 0 ? avgRating.toFixed(1) : '—'}</h3>
+              </div>
+            </Card>
+            <Card className="p-6 bg-white shadow-sm flex items-center gap-4">
+              <div className="p-3 bg-indigo-50 text-indigo-600 rounded-lg"><BarChart3 className="w-5 h-5" /></div>
+              <div>
+                <p className="text-sm text-slate-500">Total Reviews</p>
+                <h3 className="text-2xl font-bold text-slate-800">{totalReviews}</h3>
+              </div>
+            </Card>
+          </div>
+
+          <Card className="mt-4 bg-white shadow-sm overflow-hidden">
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="font-bold text-slate-800">My Paintings</h3>
+              <Button size="sm" onClick={() => router.push('/sell')} className="gap-2">
+                <Plus className="w-4 h-4" /> Add New
+              </Button>
+            </div>
+            {dataLoading ? (
+              <div className="p-10 flex justify-center">
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              </div>
+            ) : listings.length === 0 ? (
+              <div className="p-10 text-center text-slate-400 italic text-sm">
+                No listings yet.{' '}
+                <Link href="/sell" className="text-primary hover:underline">List your first painting</Link>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-50">
+                {listings.map((p) => (
+                  <div key={p.productId} className="p-5 flex items-center gap-4 hover:bg-slate-50">
+                    <div className="w-12 h-12 rounded-lg bg-slate-100 overflow-hidden flex-shrink-0">
+                      {p.images?.[0] && <img src={p.images[0]} alt={p.title} className="w-full h-full object-cover" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-slate-800 truncate">{p.title}</p>
+                      <p className="text-xs text-slate-500">{p.craftType} · {p.region}</p>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className="font-bold text-primary">₹{p.price}</p>
+                      <p className="text-xs text-slate-400">{p.reviewCount ?? 0} reviews</p>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={() => router.push(`/product/${p.productId}`)}>
+                      <TrendingUp className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+        </section>
+
       </div>
     </main>
   )
