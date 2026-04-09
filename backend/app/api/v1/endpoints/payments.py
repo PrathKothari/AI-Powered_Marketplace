@@ -11,6 +11,7 @@ from pydantic import BaseModel
 
 from app.core.config import settings
 from app.core.deps import get_current_user
+from app.api.v1.endpoints.orders import _resolve_seller_ids
 
 router = APIRouter()
 
@@ -98,9 +99,11 @@ def verify_payment(
 
     # Signature valid → create order in Firestore
     order_id = f"ORD-{uuid.uuid4().hex[:8].upper()}"
+    seller_ids = _resolve_seller_ids(db, request.items)
     order_data = {
         "orderId": order_id,
         "userId": current_user["sub"],
+        "sellerIds": seller_ids,
         "items": [item.model_dump() for item in request.items],
         "total": request.total,
         "status": "Processing",

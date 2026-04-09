@@ -40,6 +40,8 @@ class Settings(BaseSettings):
 
     # AI/ML
     ML_MODEL_PATH: str = "./app/ml/models"
+    GEMINI_API_KEY: Optional[str] = None
+    HF_TOKEN: Optional[str] = None
 
     # Pinecone
     PINECONE_API_KEY: str = ""

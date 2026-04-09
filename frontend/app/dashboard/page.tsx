@@ -3,13 +3,15 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
-import { getOrders, getMyListings, Order } from '@/lib/api'
+import { getOrders, getSellerOrders, getMyListings, updateOrderStatus, Order } from '@/lib/api'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
+import { toast } from 'sonner'
 import {
   Package, Star, TrendingUp, CreditCard, ShoppingBag,
-  BarChart3, ChevronRight, Plus, Paintbrush,
+  BarChart3, ChevronRight, Plus, Paintbrush, Truck, IndianRupee,
 } from 'lucide-react'
 
 export default function DashboardPage() {
@@ -17,8 +19,10 @@ export default function DashboardPage() {
   const { user, loading } = useAuth()
 
   const [orders, setOrders] = useState<Order[]>([])
+  const [sellerOrders, setSellerOrders] = useState<Order[]>([])
   const [listings, setListings] = useState<any[]>([])
   const [dataLoading, setDataLoading] = useState(true)
+  const [updatingStatus, setUpdatingStatus] = useState<string | null>(null)
 
   useEffect(() => {
     if (!loading && !user) router.push('/login')
@@ -26,8 +30,9 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!user) return
-    Promise.all([getOrders(), getMyListings()]).then(([o, l]) => {
+    Promise.all([getOrders(), getSellerOrders(), getMyListings()]).then(([o, so, l]) => {
       setOrders(o)
+      setSellerOrders(so)
       setListings(l)
       setDataLoading(false)
     })
@@ -47,6 +52,29 @@ export default function DashboardPage() {
     ? listings.reduce((sum, p) => sum + (p.rating ?? 0), 0) / listings.length
     : 0
   const totalReviews = listings.reduce((sum, p) => sum + (p.reviewCount ?? 0), 0)
+  const totalRevenue = sellerOrders.reduce((sum, o) => sum + o.total, 0)
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'Processing': return <Badge className="bg-blue-100 text-blue-700 border-none">Processing</Badge>
+      case 'Shipped': return <Badge className="bg-amber-100 text-amber-700 border-none">Shipped</Badge>
+      case 'Delivered': return <Badge className="bg-emerald-100 text-emerald-700 border-none">Delivered</Badge>
+      default: return <Badge variant="outline">{status}</Badge>
+    }
+  }
+
+  const handleMarkShipped = async (orderId: string) => {
+    setUpdatingStatus(orderId)
+    try {
+      const updated = await updateOrderStatus(orderId, 'Shipped')
+      setSellerOrders(prev => prev.map(o => o.orderId === orderId ? { ...o, status: updated.status } : o))
+      toast.success('Order marked as Shipped')
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update status')
+    } finally {
+      setUpdatingStatus(null)
+    }
+  }
 
   return (
     <main className="min-h-screen bg-slate-50 p-4 md:p-8 lg:px-12 pb-24">
@@ -120,6 +148,7 @@ export default function DashboardPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
+                    {getStatusBadge(order.status)}
                     <span className="font-bold text-slate-800">₹{order.total.toFixed(0)}</span>
                     <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-primary" />
                   </div>
@@ -198,6 +227,84 @@ export default function DashboardPage() {
                     <Button variant="ghost" size="sm" onClick={() => router.push(`/product/${p.productId}`)}>
                       <TrendingUp className="w-4 h-4" />
                     </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+        </section>
+
+        {/* ── MY SALES SECTION ── */}
+        <section>
+          <h2 className="text-lg font-bold text-slate-700 mb-4 flex items-center gap-2">
+            <Truck className="w-5 h-5 text-primary" /> My Sales
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <Card className="p-6 bg-white shadow-sm flex items-center gap-4">
+              <div className="p-3 bg-emerald-50 text-emerald-600 rounded-lg"><IndianRupee className="w-5 h-5" /></div>
+              <div>
+                <p className="text-sm text-slate-500">Total Revenue</p>
+                <h3 className="text-2xl font-bold text-slate-800">₹{totalRevenue.toFixed(0)}</h3>
+              </div>
+            </Card>
+            <Card className="p-6 bg-white shadow-sm flex items-center gap-4">
+              <div className="p-3 bg-teal-50 text-teal-600 rounded-lg"><Package className="w-5 h-5" /></div>
+              <div>
+                <p className="text-sm text-slate-500">Orders Received</p>
+                <h3 className="text-2xl font-bold text-slate-800">{sellerOrders.length}</h3>
+              </div>
+            </Card>
+          </div>
+
+          <Card className="bg-white shadow-sm overflow-hidden">
+            <div className="p-5 border-b border-slate-100">
+              <h3 className="font-bold text-slate-800">Incoming Orders</h3>
+              <p className="text-xs text-slate-400 mt-0.5">Orders placed by buyers for your paintings</p>
+            </div>
+            {dataLoading ? (
+              <div className="p-10 flex justify-center">
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              </div>
+            ) : sellerOrders.length === 0 ? (
+              <div className="p-10 text-center text-slate-400 italic text-sm">
+                No sales yet. Your orders will appear here once buyers purchase your paintings.
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-50">
+                {sellerOrders.map((order) => (
+                  <div key={order.orderId} className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
+                        <Package className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-slate-800 text-sm">{order.orderId}</p>
+                        <p className="text-xs text-slate-500">
+                          {new Date(order.createdAt).toLocaleDateString()} · {order.items.length} item{order.items.length > 1 ? 's' : ''}
+                        </p>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {order.items.map((item, i) => (
+                            <span key={i} className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{item.name}</span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 flex-shrink-0">
+                      <span className="font-bold text-slate-800">₹{order.total.toFixed(0)}</span>
+                      {getStatusBadge(order.status)}
+                      {order.status === 'Processing' && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-1.5 text-amber-600 border-amber-200 hover:bg-amber-50"
+                          disabled={updatingStatus === order.orderId}
+                          onClick={() => handleMarkShipped(order.orderId)}
+                        >
+                          <Truck className="w-3.5 h-3.5" />
+                          {updatingStatus === order.orderId ? '...' : 'Mark Shipped'}
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>

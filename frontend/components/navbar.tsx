@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { ShoppingCart, User, Menu, Paintbrush, LogOut, ChevronDown, LayoutDashboard, Plus, Package } from 'lucide-react'
+import { ShoppingCart, User, Menu, Paintbrush, LogOut, ChevronDown, LayoutDashboard, Plus, Package, UserCircle } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCart } from '@/context/CartContext'
@@ -107,6 +107,9 @@ export default function Navbar() {
                     </div>
                     <Link href="/dashboard" className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-secondary transition-colors" onClick={() => setUserMenuOpen(false)}>
                       <LayoutDashboard className="w-4 h-4" /> Dashboard
+                    </Link>
+                    <Link href="/profile" className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-secondary transition-colors" onClick={() => setUserMenuOpen(false)}>
+                      <UserCircle className="w-4 h-4" /> My Profile
                     </Link>
                     <Link href="/orders" className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-secondary transition-colors" onClick={() => setUserMenuOpen(false)}>
                       <Package className="w-4 h-4" /> My Orders

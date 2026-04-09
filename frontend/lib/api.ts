@@ -77,6 +77,16 @@ export const getCategories = async () => {
     }
 };
 
+export const createCategory = async (name: string, description: string = '') => {
+    const token = getAuthToken()
+    if (!token) throw new Error('You must be logged in to create a category')
+    return fetchApi<any>('/categories', {
+        method: 'POST',
+        data: { name, description },
+        token,
+    })
+};
+
 export const getCatalogProducts = async (craftType?: string) => {
     try {
         const query = craftType ? `?craft_type=${encodeURIComponent(craftType)}` : '';
@@ -148,6 +158,16 @@ export const getOrders = async (): Promise<Order[]> => {
     }
 }
 
+export const getSellerOrders = async (): Promise<Order[]> => {
+    const token = getAuthToken()
+    if (!token) return []
+    try {
+        return await fetchApi<Order[]>('/orders/seller', { token })
+    } catch {
+        return []
+    }
+}
+
 // ─── Listings (Sell) ──────────────────────────────────────────────────────────
 
 export interface CreateListingPayload {
@@ -158,13 +178,25 @@ export interface CreateListingPayload {
     region: string
     materials: string
     images: string[]
-    storyVideo: string
+    storyVideo?: string
 }
 
 export const createListing = async (payload: CreateListingPayload) => {
     const token = getAuthToken()
     if (!token) throw new Error('You must be logged in to list a product')
     return fetchApi<any>('/catalog', { method: 'POST', data: payload, token })
+}
+
+export const updateListing = async (productId: string, payload: Partial<CreateListingPayload>): Promise<any> => {
+    const token = getAuthToken()
+    if (!token) throw new Error('You must be logged in')
+    return fetchApi<any>(`/catalog/${productId}`, { method: 'PUT', data: payload, token })
+}
+
+export const deleteListing = async (productId: string): Promise<void> => {
+    const token = getAuthToken()
+    if (!token) throw new Error('You must be logged in')
+    await fetchApi<void>(`/catalog/${productId}`, { method: 'DELETE', token })
 }
 
 export const getMyListings = async (): Promise<any[]> => {
@@ -178,6 +210,22 @@ export const getMyListings = async (): Promise<any[]> => {
     } catch {
         return []
     }
+}
+
+// ─── Order Status ─────────────────────────────────────────────────────────────
+
+export const updateOrderStatus = async (orderId: string, status: string): Promise<Order> => {
+    const token = getAuthToken()
+    if (!token) throw new Error('You must be logged in')
+    return fetchApi<Order>(`/orders/${orderId}/status`, { method: 'PATCH', data: { status }, token })
+}
+
+// ─── Profile ──────────────────────────────────────────────────────────────────
+
+export const updateProfile = async (name: string): Promise<{ access_token: string; user: any }> => {
+    const token = getAuthToken()
+    if (!token) throw new Error('You must be logged in')
+    return fetchApi('/auth/profile', { method: 'PATCH', data: { name }, token })
 }
 
 // ─── Payments (Razorpay) ──────────────────────────────────────────────────────

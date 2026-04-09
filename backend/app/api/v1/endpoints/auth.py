@@ -5,6 +5,8 @@ from firebase_admin import auth, firestore
 
 logger = logging.getLogger(__name__)
 
+from pydantic import BaseModel
+
 from app.schemas.auth import (
     SignUpRequest,
     LoginRequest,
@@ -13,6 +15,10 @@ from app.schemas.auth import (
     AuthResponse,
     AuthUser,
 )
+
+
+class UpdateProfileRequest(BaseModel):
+    name: str
 from app.schemas.firestore import UserBase
 from app.core.email import send_welcome_email
 from app.core.config import settings
@@ -285,3 +291,25 @@ async def logout():
     A future improvement would store a token blacklist in Firestore.
     """
     return {"message": "Logged out successfully"}
+
+
+# ---------------------------------------------------------------------------
+# Update Profile
+# ---------------------------------------------------------------------------
+
+@router.patch("/profile", response_model=AuthResponse)
+async def update_profile(
+    request: UpdateProfileRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Update the authenticated user's display name."""
+    uid = current_user["sub"]
+    db = get_db()
+    db.collection("users").document(uid).update({"name": request.name})
+    auth.update_user(uid, display_name=request.name)
+    return _build_auth_response(
+        uid=uid,
+        email=current_user["email"],
+        name=request.name,
+        role=current_user.get("role", "user"),
+    )

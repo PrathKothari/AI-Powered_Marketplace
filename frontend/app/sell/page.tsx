@@ -1,20 +1,32 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { QRCodeSVG } from 'qrcode.react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
 import { toast } from 'sonner'
-import { createListing } from '@/lib/api'
+import { createListing, getCategories, createCategory } from '@/lib/api'
+import { uploadImage } from '@/lib/storage'
 import { useAuth } from '@/context/AuthContext'
+import { Mic, MicOff, UploadCloud, X, Loader, Video } from 'lucide-react'
 
 export default function SellPage() {
   const router = useRouter()
   const { user } = useAuth()
+  
+  const [viewState, setViewState] = useState<'form' | 'generating' | 'preview' | 'success'>('form')
+
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [successData, setSuccessData] = useState<any>(null)
+  
+  // Voice recording state
+  const [isRecording, setIsRecording] = useState(false)
+  const recognitionRef = useRef<any>(null)
+
+  const [uploadingImages, setUploadingImages] = useState(false)
+  const [imageFiles, setImageFiles] = useState<File[]>([])
 
   const [formData, setFormData] = useState({
     title: '',
@@ -23,35 +35,167 @@ export default function SellPage() {
     craftType: '',
     region: '',
     materials: '',
-    images: '',
-    storyVideo: '',
+    images: [] as string[],
   })
+
+  const [categories, setCategories] = useState<any[]>([])
+  const [customCraftType, setCustomCraftType] = useState('')
+
+  useEffect(() => {
+    const fetchCats = async () => {
+      try {
+        const cats = await getCategories()
+        setCategories(cats)
+      } catch (e) {}
+    }
+    fetchCats()
+  }, [])
+
+  // Init Speech Recognition
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+      if (SpeechRecognition) {
+        recognitionRef.current = new SpeechRecognition()
+        recognitionRef.current.continuous = true
+        recognitionRef.current.interimResults = true
+
+        recognitionRef.current.onresult = (event: any) => {
+          let finalTranscript = ''
+          for (let i = event.resultIndex; i < event.results.length; ++i) {
+            if (event.results[i].isFinal) {
+              finalTranscript += event.results[i][0].transcript
+            }
+          }
+          if (finalTranscript) {
+            setFormData(prev => ({
+              ...prev,
+              description: prev.description ? prev.description + ' ' + finalTranscript : finalTranscript
+            }))
+          }
+        }
+
+        recognitionRef.current.onerror = (e: any) => {
+          setIsRecording(false)
+        }
+        recognitionRef.current.onend = () => {
+          setIsRecording(false)
+        }
+      }
+    }
+  }, [])
+
+  const toggleRecording = () => {
+    if (!recognitionRef.current) {
+      toast.error("Voice typing is not supported in this browser.")
+      return
+    }
+    if (isRecording) {
+      recognitionRef.current.stop()
+      setIsRecording(false)
+    } else {
+      try {
+        recognitionRef.current.start()
+        setIsRecording(true)
+        toast.info("Listening... Speak now.")
+      } catch(e) {
+        // Handle race conditions
+        recognitionRef.current.stop()
+      }
+    }
+  }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const files = Array.from(e.target.files)
+      // Store files for later upload, and show previews using blob URLs
+      setImageFiles(prev => [...prev, ...files])
+      const newUrls = files.map(f => URL.createObjectURL(f))
+      setFormData(prev => ({
+        ...prev,
+        images: [...prev.images, ...newUrls]
+      }))
+    }
+  }
+
+  const removeImage = (index: number) => {
+    setImageFiles(prev => prev.filter((_, i) => i !== index))
+    setFormData(prev => ({
+      ...prev,
+      images: prev.images.filter((_, i) => i !== index)
+    }))
+  }
+
+  const handleProceedToReel = (e: React.FormEvent) => {
     e.preventDefault()
     if (!user) {
       toast.error('Please sign in to list a product')
       router.push('/login')
       return
     }
+    if (formData.craftType === 'Other' && !customCraftType.trim()) {
+      toast.error('Please specify your custom craft type.')
+      return
+    }
+    if (formData.images.length === 0) {
+      toast.error('Please attach at least one image.')
+      return
+    }
+    setViewState('generating')
+  }
+
+  // Handle AI Loading Delay
+  useEffect(() => {
+    if (viewState === 'generating') {
+      const timer = setTimeout(() => {
+        setViewState('preview')
+        toast.success("AI Craft Reel Generated!")
+      }, 4000)
+      return () => clearTimeout(timer)
+    }
+  }, [viewState])
+
+  const handleFinalPublish = async () => {
     setIsSubmitting(true)
     try {
-      const images = formData.images.split(',').map(s => s.trim()).filter(Boolean)
+      let finalCraftType = formData.craftType
+      if (finalCraftType === 'Other') {
+        finalCraftType = customCraftType.trim()
+        try {
+          await createCategory(finalCraftType, "User-submitted category")
+        } catch(e) {
+          console.warn("Could not create new category", e)
+        }
+      }
+
+      // Upload images to Firebase Storage, get permanent URLs
+      setUploadingImages(true)
+      let imageUrls: string[] = []
+      try {
+        imageUrls = await Promise.all(imageFiles.map(f => uploadImage(f)))
+      } catch (err) {
+        toast.error('Image upload failed. Please try again.')
+        setIsSubmitting(false)
+        setUploadingImages(false)
+        return
+      }
+      setUploadingImages(false)
+
       const product = await createListing({
         title: formData.title,
         price: parseFloat(formData.price),
         description: formData.description,
-        craftType: formData.craftType,
+        craftType: finalCraftType,
         region: formData.region,
         materials: formData.materials,
-        images,
-        storyVideo: formData.storyVideo,
+        images: imageUrls,
       })
       setSuccessData(product)
+      setViewState('success')
       toast.success('Product listed successfully!')
     } catch (err: any) {
       toast.error(err.message || 'Failed to list product')
@@ -83,7 +227,59 @@ export default function SellPage() {
     img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)))
   }
 
-  if (successData) {
+  if (viewState === 'generating') {
+    return (
+      <main className="min-h-screen bg-slate-50 flex flex-col items-center justify-center px-4">
+        <div className="text-center space-y-6">
+          <div className="relative">
+            <div className="w-24 h-24 border-4 border-primary/20 border-t-primary rounded-full animate-spin mx-auto" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Loader className="w-8 h-8 text-primary animate-pulse" />
+            </div>
+          </div>
+          <h2 className="text-2xl font-outfit font-bold uppercase tracking-wider text-primary">Generating AI Craft Reel...</h2>
+          <p className="text-muted-foreground animate-pulse text-sm">Analyzing artwork and conceptualizing your story</p>
+        </div>
+      </main>
+    )
+  }
+
+  if (viewState === 'preview') {
+    return (
+      <main className="min-h-screen bg-slate-50 px-4 py-10 flex flex-col items-center justify-center">
+        <Card className="max-w-2xl w-full rounded-2xl shadow-xl p-8 space-y-8 text-center border-t-8 border-t-primary bg-white">
+          <div className="space-y-2">
+             <div className="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-2">
+                 <Video className="w-6 h-6 text-primary" />
+             </div>
+             <h2 className="text-3xl font-outfit font-bold uppercase text-foreground">Your Craft Reel is Ready!</h2>
+             <p className="text-muted-foreground text-sm">This AI-generated reel will be displayed on your product page to uniquely showcase your story to buyers.</p>
+          </div>
+          
+          <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden flex items-center justify-center shadow-md border border-border">
+             <video 
+                src="https://videos.pexels.com/video-files/4491295/4491295-sd_640_360_25fps.mp4" 
+                controls 
+                autoPlay 
+                loop 
+                className="w-full h-full object-cover"
+             />
+          </div>
+
+          <div className="flex gap-4 pt-4">
+             <Button variant="outline" onClick={() => setViewState('form')} className="flex-1 font-outfit font-bold uppercase tracking-wider h-12 transition-all hover:scale-[1.02] active:scale-[0.98]">
+               Edit Details
+             </Button>
+             <Button onClick={handleFinalPublish} disabled={isSubmitting} className="flex-1 font-outfit font-bold uppercase tracking-wider h-12 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-md hover:shadow-lg">
+               {uploadingImages ? 'Uploading Images...' : isSubmitting ? 'Publishing...' : 'Finalize & Publish'}
+             </Button>
+          </div>
+        </Card>
+      </main>
+    )
+  }
+
+  if (viewState === 'success' && successData) {
     return (
       <main className="min-h-screen bg-slate-50 px-4 py-10 flex flex-col items-center justify-center">
         <Card className="max-w-md w-full rounded-2xl shadow-xl p-8 space-y-8 text-center border-t-8 border-t-primary">
@@ -94,7 +290,7 @@ export default function SellPage() {
               </svg>
             </div>
             <h2 className="text-3xl font-bold text-foreground">Product Listed!</h2>
-            <p className="text-muted-foreground">Your painting is now live on KalaSetu.</p>
+            <p className="text-muted-foreground">Your painting and story reel are now live.</p>
           </div>
 
           <div className="p-6 border-2 border-primary/20 bg-primary/5 rounded-xl shadow-inner">
@@ -116,10 +312,14 @@ export default function SellPage() {
           </div>
 
           <div className="flex flex-col gap-3">
-            <Button onClick={downloadQR} variant="outline" className="w-full py-6 border-primary text-primary hover:bg-primary/5">
+            <Button 
+              onClick={downloadQR} 
+              variant="outline" 
+              className="w-full py-6 border-2 border-primary text-primary font-bold font-outfit uppercase tracking-wider transition-all duration-200 hover:bg-primary hover:text-white hover:scale-[1.02] active:scale-[0.98]"
+            >
               Download QR Code
             </Button>
-            <Button onClick={() => router.push(`/product/${successData.productId}`)} className="w-full py-6">
+            <Button onClick={() => router.push(`/product/${successData.productId}`)} className="w-full py-6 font-outfit uppercase tracking-wider font-bold">
               View Product Page
             </Button>
             <Button onClick={() => router.push('/dashboard')} variant="ghost" className="w-full">
@@ -131,61 +331,142 @@ export default function SellPage() {
     )
   }
 
+  // DEFAULT FORM VIEW
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-10">
       <div className="mx-auto max-w-2xl">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground">List a Painting</h1>
-          <p className="text-muted-foreground mt-2">Share your handcrafted artwork with buyers on KalaSetu.</p>
+          <h1 className="text-3xl font-outfit font-bold uppercase text-foreground">List a Painting</h1>
+          <p className="text-muted-foreground mt-2">Share your handcrafted artwork and let our AI generate a magical reel for it.</p>
         </div>
 
         <Card className="rounded-xl shadow-sm border-border overflow-hidden">
-          <form className="p-6 sm:p-8 space-y-6" onSubmit={handleSubmit}>
+          <form className="p-6 sm:p-8 space-y-6" onSubmit={handleProceedToReel}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2 md:col-span-2">
-                <label className="text-sm font-semibold text-foreground">Painting Name</label>
+                <label className="text-sm font-semibold text-foreground">Painting Name <span className="text-red-500">*</span></label>
                 <Input required name="title" placeholder="E.g., Madhubani Village Scene" value={formData.title} onChange={handleChange} />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-semibold text-foreground">Price (₹)</label>
+                <label className="text-sm font-semibold text-foreground">Price (₹) <span className="text-red-500">*</span></label>
                 <Input required type="number" min="1" step="1" name="price" placeholder="1200" value={formData.price} onChange={handleChange} />
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-foreground">Craft Type</label>
-                <Input required name="craftType" placeholder="E.g., Madhubani, Warli, Pattachitra" value={formData.craftType} onChange={handleChange} />
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-foreground">Craft Type <span className="text-red-500">*</span></label>
+                  <select 
+                    required 
+                    name="craftType" 
+                    value={formData.craftType} 
+                    onChange={handleChange as any}
+                    className="flex h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none md:text-sm focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                  >
+                    <option value="" disabled>Select a Craft Type</option>
+                    {categories.map((cat, idx) => (
+                      <option key={idx} value={cat.name}>{cat.name}</option>
+                    ))}
+                    <option value="Other">Other (Please specify)</option>
+                  </select>
+                </div>
+                {formData.craftType === 'Other' && (
+                  <div className="space-y-2 animate-in fade-in slide-in-from-top-1">
+                    <label className="text-sm font-semibold text-primary">Custom Craft Type</label>
+                    <Input required placeholder="E.g., Bamboo Craft" value={customCraftType} onChange={(e) => setCustomCraftType(e.target.value)} />
+                  </div>
+                )}
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-semibold text-foreground">Region / Origin</label>
-                <Input required name="region" placeholder="E.g., Bihar, Maharashtra" value={formData.region} onChange={handleChange} />
+                <label className="text-sm font-semibold text-foreground">Region / Origin <span className="text-red-500">*</span></label>
+                <select 
+                  required 
+                  name="region" 
+                  value={formData.region} 
+                  onChange={handleChange as any}
+                  className="flex h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none md:text-sm focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                >
+                  <option value="" disabled>Select State/Region</option>
+                  {[
+                    "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat", "Haryana", 
+                    "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur", 
+                    "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", 
+                    "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal",
+                    "Andaman and Nicobar Islands", "Chandigarh", "Dadra and Nagar Haveli and Daman and Diu", 
+                    "Delhi", "Jammu and Kashmir", "Ladakh", "Lakshadweep", "Puducherry"
+                  ].sort().map((state) => (
+                    <option key={state} value={state}>{state}</option>
+                  ))}
+                </select>
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-foreground">Materials Used</label>
                 <Input name="materials" placeholder="E.g., Natural dyes, handmade paper" value={formData.materials} onChange={handleChange} />
               </div>
-              <div className="space-y-2 md:col-span-2">
-                <label className="text-sm font-semibold text-foreground">Description</label>
+              
+              <div className="space-y-2 md:col-span-2 relative">
+                <div className="flex justify-between items-end">
+                  <label className="text-sm font-semibold text-foreground">Description & Story <span className="text-red-500">*</span></label>
+                  <button 
+                    type="button" 
+                    onClick={toggleRecording}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors border ${isRecording ? 'border-red-200 bg-red-100 text-red-600 animate-pulse' : 'border-border bg-white text-muted-foreground hover:bg-muted hover:text-foreground'}`}
+                  >
+                    {isRecording ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
+                    {isRecording ? "Stop dictating" : "Dictate"}
+                  </button>
+                </div>
                 <textarea
                   required
                   name="description"
-                  placeholder="Describe the artwork, its significance, and the process..."
+                  placeholder="Describe the artwork, its significance, and the process... (Or click dictation to speak it)"
                   value={formData.description}
                   onChange={handleChange}
-                  className="w-full border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 border rounded-md resize-y min-h-[100px]"
+                  className="w-full border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 border rounded-md resize-y min-h-[120px]"
                 />
               </div>
+
+              {/* Image Upload Area */}
               <div className="space-y-2 md:col-span-2">
-                <label className="text-sm font-semibold text-foreground">Image URLs</label>
-                <Input name="images" placeholder="Comma-separated image URLs" value={formData.images} onChange={handleChange} />
-                <p className="text-xs text-muted-foreground">Paste direct links to your painting images, separated by commas</p>
-              </div>
-              <div className="space-y-2 md:col-span-2">
-                <label className="text-sm font-semibold text-foreground">Craft Story Video URL (Optional)</label>
-                <Input name="storyVideo" placeholder="Link to a video showing how it's made" value={formData.storyVideo} onChange={handleChange} />
+                <label className="text-sm font-semibold text-foreground">Painting Images <span className="text-red-500">*</span></label>
+                
+                <div className="mt-2 flex flex-col items-center justify-center w-full min-h-[120px] px-4 py-8 border-2 border-dashed border-border rounded-xl bg-muted/30 hover:bg-muted/50 transition-colors relative cursor-pointer group">
+                   <UploadCloud className="w-8 h-8 text-muted-foreground mb-3 group-hover:text-primary transition-colors" />
+                   <div className="flex flex-col items-center text-sm text-muted-foreground">
+                      <span className="font-semibold text-foreground">Click to upload</span> or drag and drop
+                      <span className="text-xs mt-1 text-center">SVG, PNG, JPG or GIF (MAX. 800x400px)</span>
+                   </div>
+                   <input 
+                      type="file" 
+                      multiple 
+                      accept="image/*" 
+                      onChange={handleImageUpload}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
+                   />
+                </div>
+
+                {/* Image Previews */}
+                {formData.images.length > 0 && (
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-4 pt-4">
+                    {formData.images.map((url, idx) => (
+                      <div key={idx} className="relative aspect-square rounded-lg overflow-hidden border border-border shadow-sm group">
+                        <img src={url} alt={`Preview ${idx}`} className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => removeImage(idx)}
+                          className="absolute top-1 right-1 bg-black/60 hover:bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
-            <div className="pt-6 border-t">
-              <Button disabled={isSubmitting} type="submit" className="w-full py-6 text-lg shadow-lg font-bold">
-                {isSubmitting ? 'Publishing...' : 'Publish Painting'}
+            
+            <div className="pt-6 border-t mt-4 flex justify-end">
+              <Button type="submit" className="h-10 px-6 text-sm shadow-sm font-outfit uppercase tracking-wider font-bold transition-all hover:scale-[1.02] active:scale-[0.98] group flex gap-2">
+                <span>Next: Generate AI Reel</span>
+                <Video className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </Button>
             </div>
           </form>

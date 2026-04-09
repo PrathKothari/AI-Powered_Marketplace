@@ -3,18 +3,29 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
-import { getMyListings } from '@/lib/api'
+import { getMyListings, updateListing, deleteListing } from '@/lib/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Package, TrendingUp, Plus, ArrowLeft, Star } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { Package, Plus, ArrowLeft, Star, Pencil, Trash2, X, Loader2 } from 'lucide-react'
 import Link from 'next/link'
+import { toast } from 'sonner'
 
 export default function InventoryPage() {
   const router = useRouter()
   const { user, loading } = useAuth()
   const [listings, setListings] = useState<any[]>([])
   const [dataLoading, setDataLoading] = useState(true)
+
+  // Edit modal state
+  const [editItem, setEditItem] = useState<any>(null)
+  const [editForm, setEditForm] = useState({ title: '', price: '', description: '', materials: '' })
+  const [editSaving, setEditSaving] = useState(false)
+
+  // Delete confirmation
+  const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [deleteLoading, setDeleteLoading] = useState(false)
 
   useEffect(() => {
     if (!loading && !user) router.push('/login')
@@ -28,6 +39,50 @@ export default function InventoryPage() {
     })
   }, [user])
 
+  const openEdit = (item: any) => {
+    setEditItem(item)
+    setEditForm({
+      title: item.title ?? '',
+      price: String(item.price ?? ''),
+      description: item.description ?? '',
+      materials: item.materials ?? '',
+    })
+  }
+
+  const handleEditSave = async () => {
+    if (!editItem) return
+    setEditSaving(true)
+    try {
+      const updated = await updateListing(editItem.productId, {
+        title: editForm.title,
+        price: parseFloat(editForm.price),
+        description: editForm.description,
+        materials: editForm.materials,
+      })
+      setListings(prev => prev.map(l => l.productId === editItem.productId ? { ...l, ...updated } : l))
+      toast.success('Listing updated!')
+      setEditItem(null)
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update listing')
+    } finally {
+      setEditSaving(false)
+    }
+  }
+
+  const handleDelete = async (productId: string) => {
+    setDeleteLoading(true)
+    try {
+      await deleteListing(productId)
+      setListings(prev => prev.filter(l => l.productId !== productId))
+      toast.success('Listing deleted')
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete listing')
+    } finally {
+      setDeleteLoading(false)
+      setDeleteId(null)
+    }
+  }
+
   if (loading || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -37,7 +92,6 @@ export default function InventoryPage() {
   }
 
   const lowStock = listings.filter(p => (p.stock ?? 0) <= 3)
-  const inStock = listings.filter(p => (p.stock ?? 0) > 3)
 
   return (
     <div className="container mx-auto p-6 space-y-8 max-w-5xl">
@@ -54,7 +108,6 @@ export default function InventoryPage() {
         </Button>
       </div>
 
-      {/* Alerts */}
       {!dataLoading && lowStock.length > 0 && (
         <Card className="bg-red-50 border-red-200">
           <CardContent className="p-4 flex items-center gap-3">
@@ -112,11 +165,91 @@ export default function InventoryPage() {
                     <Button variant="outline" size="sm" className="flex-1" onClick={() => router.push(`/product/${item.productId}`)}>
                       View
                     </Button>
+                    <Button variant="outline" size="sm" className="flex-1 gap-1" onClick={() => openEdit(item)}>
+                      <Pencil className="w-3.5 h-3.5" /> Edit
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-destructive border-destructive/30 hover:bg-destructive/5"
+                      onClick={() => setDeleteId(item.productId)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
             )
           })}
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {editItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <Card className="w-full max-w-md bg-white rounded-2xl shadow-2xl">
+            <div className="p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold">Edit Listing</h2>
+                <button onClick={() => setEditItem(null)} className="text-muted-foreground hover:text-foreground">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-sm font-semibold">Title</label>
+                  <Input value={editForm.title} onChange={e => setEditForm(f => ({ ...f, title: e.target.value }))} />
+                </div>
+                <div>
+                  <label className="text-sm font-semibold">Price (₹)</label>
+                  <Input type="number" value={editForm.price} onChange={e => setEditForm(f => ({ ...f, price: e.target.value }))} />
+                </div>
+                <div>
+                  <label className="text-sm font-semibold">Materials</label>
+                  <Input value={editForm.materials} onChange={e => setEditForm(f => ({ ...f, materials: e.target.value }))} />
+                </div>
+                <div>
+                  <label className="text-sm font-semibold">Description</label>
+                  <textarea
+                    value={editForm.description}
+                    onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
+                    className="w-full border border-input rounded-md px-3 py-2 text-sm min-h-[80px] resize-y focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2 pt-2">
+                <Button variant="outline" className="flex-1" onClick={() => setEditItem(null)}>Cancel</Button>
+                <Button className="flex-1" onClick={handleEditSave} disabled={editSaving}>
+                  {editSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save Changes'}
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Delete Confirmation */}
+      {deleteId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <Card className="w-full max-w-sm bg-white rounded-2xl shadow-2xl">
+            <div className="p-6 space-y-4 text-center">
+              <div className="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center mx-auto">
+                <Trash2 className="w-7 h-7 text-red-500" />
+              </div>
+              <h2 className="text-xl font-bold">Delete Listing?</h2>
+              <p className="text-muted-foreground text-sm">This action cannot be undone. The painting will be permanently removed.</p>
+              <div className="flex gap-2">
+                <Button variant="outline" className="flex-1" onClick={() => setDeleteId(null)}>Cancel</Button>
+                <Button
+                  className="flex-1 bg-destructive hover:bg-destructive/90 text-white"
+                  onClick={() => handleDelete(deleteId)}
+                  disabled={deleteLoading}
+                >
+                  {deleteLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Delete'}
+                </Button>
+              </div>
+            </div>
+          </Card>
         </div>
       )}
     </div>

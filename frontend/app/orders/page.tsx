@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { getOrders, Order } from "@/lib/api"
+import { getOrders, updateOrderStatus, Order } from "@/lib/api"
 import {
   Package,
   ChevronDown,
@@ -10,8 +10,11 @@ import {
   Calendar,
   CreditCard,
   ExternalLink,
-  ShoppingBag
+  ShoppingBag,
+  Truck,
+  CheckCircle2,
 } from "lucide-react"
+import { toast } from "sonner"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -21,6 +24,20 @@ export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([])
   const [expandedOrders, setExpandedOrders] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
+  const [updatingStatus, setUpdatingStatus] = useState<string | null>(null)
+
+  const handleStatusUpdate = async (orderId: string, newStatus: string) => {
+    setUpdatingStatus(orderId)
+    try {
+      const updated = await updateOrderStatus(orderId, newStatus)
+      setOrders(prev => prev.map(o => o.orderId === orderId ? { ...o, status: updated.status } : o))
+      toast.success(`Order marked as ${newStatus}`)
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update status')
+    } finally {
+      setUpdatingStatus(null)
+    }
+  }
 
   useEffect(() => {
     getOrders().then(data => {
@@ -153,9 +170,32 @@ export default function OrdersPage() {
                     </div>
 
                     <div className="pt-4 border-t border-dashed border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                       <p className="text-xs text-slate-400 max-w-xs leading-relaxed italic">
-                         Your order is securely recorded. Track shipping updates via your artisan studio dashboard.
-                       </p>
+                       <div className="flex gap-2 flex-wrap">
+                         {order.status === 'Processing' && (
+                           <Button
+                             size="sm"
+                             variant="outline"
+                             className="gap-1.5 text-amber-600 border-amber-200 hover:bg-amber-50"
+                             disabled={updatingStatus === order.orderId}
+                             onClick={() => handleStatusUpdate(order.orderId, 'Shipped')}
+                           >
+                             <Truck className="w-4 h-4" />
+                             {updatingStatus === order.orderId ? 'Updating...' : 'Mark as Shipped'}
+                           </Button>
+                         )}
+                         {order.status === 'Shipped' && (
+                           <Button
+                             size="sm"
+                             variant="outline"
+                             className="gap-1.5 text-emerald-600 border-emerald-200 hover:bg-emerald-50"
+                             disabled={updatingStatus === order.orderId}
+                             onClick={() => handleStatusUpdate(order.orderId, 'Delivered')}
+                           >
+                             <CheckCircle2 className="w-4 h-4" />
+                             {updatingStatus === order.orderId ? 'Updating...' : 'Mark as Delivered'}
+                           </Button>
+                         )}
+                       </div>
                        <Link href={`/product/${order.items[0]?.id}`}>
                           <Button variant="ghost" size="sm" className="text-primary hover:bg-primary/5 font-bold gap-2">
                             View Painting <ExternalLink className="w-4 h-4" />
