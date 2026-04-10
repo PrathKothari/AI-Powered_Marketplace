@@ -8,3 +8,11 @@ export async function uploadImage(file: File): Promise<string> {
   const snapshot = await uploadBytes(storageRef, file)
   return getDownloadURL(snapshot.ref)
 }
+
+export async function uploadProfilePhoto(userId: string, file: File): Promise<string> {
+  const ext = file.name.split('.').pop() || 'jpg'
+  const path = `profile_photos/${userId}.${ext}`
+  const storageRef = ref(storage, path)
+  const snapshot = await uploadBytes(storageRef, file)
+  return getDownloadURL(snapshot.ref)
+}

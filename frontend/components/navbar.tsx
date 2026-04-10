@@ -1,22 +1,30 @@
 'use client'
 
 import Link from 'next/link'
-import { ShoppingCart, User, Menu, Paintbrush, LogOut, ChevronDown, LayoutDashboard, Plus, Package, UserCircle } from 'lucide-react'
+import { ShoppingCart, User, Menu, Paintbrush, LogOut, ChevronDown, LayoutDashboard, Plus, Package, UserCircle, Radio } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCart } from '@/context/CartContext'
 import { useTranslation } from '@/lib/i18n'
 import { useAuth } from '@/context/AuthContext'
+import { getUserProfile } from '@/lib/api'
 import { toast } from 'sonner'
 
 export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null)
   const { totalItems } = useCart()
   const { t, lang, setLang } = useTranslation()
   const { user, logout } = useAuth()
   const router = useRouter()
   const menuRef = useRef<HTMLDivElement>(null)
+
+  // Fetch profile photo
+  useEffect(() => {
+    if (!user) { setPhotoUrl(null); return }
+    getUserProfile(user.uid).then(p => setPhotoUrl(p.photoUrl || null)).catch(() => {})
+  }, [user])
 
   // Close user dropdown on outside click
   useEffect(() => {
@@ -57,8 +65,8 @@ export default function Navbar() {
             <Link href="/reels" className="text-sm font-outfit font-bold uppercase tracking-wider hover:text-primary transition-colors">
               Reels
             </Link>
-            <Link href="/discover" className="text-sm font-outfit font-bold uppercase tracking-wider hover:text-primary transition-colors">
-              Discover
+            <Link href="/live" className="text-sm font-outfit font-bold uppercase tracking-wider hover:text-primary transition-colors">
+              Live
             </Link>
             <Link href="/origin" className="text-sm font-outfit font-bold uppercase tracking-wider hover:text-primary transition-colors">
               Origin
@@ -93,9 +101,13 @@ export default function Navbar() {
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
                   className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-secondary transition-colors"
                 >
-                  <div className="w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold uppercase">
-                    {user.name.charAt(0)}
-                  </div>
+                  {photoUrl ? (
+                    <img src={photoUrl} alt={user.name} className="w-7 h-7 rounded-full object-cover" />
+                  ) : (
+                    <div className="w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold uppercase">
+                      {user.name.charAt(0)}
+                    </div>
+                  )}
                   <span className="text-sm font-medium hidden lg:block max-w-[100px] truncate">{user.name}</span>
                   <ChevronDown className="w-4 h-4 text-muted-foreground" />
                 </button>
@@ -167,8 +179,8 @@ export default function Navbar() {
             <Link href="/reels" className="block text-sm font-medium hover:text-primary transition-colors py-2">
               Reels
             </Link>
-            <Link href="/discover" className="block text-sm font-medium hover:text-primary transition-colors py-2">
-              Discover
+            <Link href="/live" className="block text-sm font-medium hover:text-primary transition-colors py-2">
+              Live
             </Link>
             <Link href="/origin" className="block text-sm font-medium hover:text-primary transition-colors py-2">
               Origin
