@@ -58,6 +58,12 @@ def create_application() -> FastAPI:
     media_root.mkdir(parents=True, exist_ok=True)
     application.mount("/media", StaticFiles(directory=str(media_root)), name="media")
 
+    # Mount HLS directory for live stream segments
+    import tempfile, os
+    hls_root = Path(os.path.join(tempfile.gettempdir(), "kalasetu_hls"))
+    hls_root.mkdir(parents=True, exist_ok=True)
+    application.mount("/hls", StaticFiles(directory=str(hls_root)), name="hls")
+
     return application
 
 app = create_application()

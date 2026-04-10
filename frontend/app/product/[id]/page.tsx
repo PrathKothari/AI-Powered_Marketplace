@@ -12,6 +12,7 @@ import { useCart } from '@/context/CartContext'
 import { Product } from '@/lib/types/product'
 import { getCatalogProducts, getProductReviews, addProductReview } from '@/lib/api'
 import ProductCard from '@/components/product-card'
+import SellerBio from '@/components/SellerBio'
 
 export default function ProductPage() {
   const router = useRouter()
@@ -184,6 +185,9 @@ export default function ProductPage() {
                   )}
                 </div>
               </div>
+
+              {/* Seller Bio */}
+              <SellerBio userId={product.artisan.name} />
 
               <div className="grid grid-cols-2 gap-4">
                 {product.images?.map((img: string, index: number) => (

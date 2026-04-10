@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
-import { getOrders, getSellerOrders, getMyListings, updateOrderStatus, Order } from '@/lib/api'
+import { getOrders, getSellerOrders, getMyListings, updateOrderStatus, getUserProfile, Order } from '@/lib/api'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -11,7 +11,7 @@ import Link from 'next/link'
 import { toast } from 'sonner'
 import {
   Package, Star, TrendingUp, CreditCard, ShoppingBag,
-  BarChart3, ChevronRight, Plus, Paintbrush, Truck, IndianRupee,
+  BarChart3, ChevronRight, Plus, Paintbrush, Truck, IndianRupee, Radio,
 } from 'lucide-react'
 
 export default function DashboardPage() {
@@ -23,6 +23,7 @@ export default function DashboardPage() {
   const [listings, setListings] = useState<any[]>([])
   const [dataLoading, setDataLoading] = useState(true)
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null)
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null)
 
   useEffect(() => {
     if (!loading && !user) router.push('/login')
@@ -30,6 +31,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!user) return
+    getUserProfile(user.uid).then(p => setPhotoUrl(p.photoUrl || null)).catch(() => {})
     Promise.all([getOrders(), getSellerOrders(), getMyListings()]).then(([o, so, l]) => {
       setOrders(o)
       setSellerOrders(so)
@@ -83,15 +85,22 @@ export default function DashboardPage() {
         {/* Profile */}
         <Card className="rounded-xl p-6 shadow-sm bg-white flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center text-2xl font-bold uppercase ring-4 ring-primary/5">
-              {user.name.charAt(0)}
-            </div>
+            {photoUrl ? (
+              <img src={photoUrl} alt={user.name} className="w-16 h-16 rounded-full object-cover ring-4 ring-primary/5" />
+            ) : (
+              <div className="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center text-2xl font-bold uppercase ring-4 ring-primary/5">
+                {user.name.charAt(0)}
+              </div>
+            )}
             <div>
               <h1 className="text-2xl font-bold text-slate-800">Welcome back, {user.name}</h1>
               <p className="text-slate-500 text-sm">{user.email}</p>
             </div>
           </div>
           <div className="flex gap-3 flex-wrap">
+            <Button onClick={() => router.push('/live/start')} className="gap-2 bg-red-500 hover:bg-red-600">
+              <Radio className="w-4 h-4" /> Go Live
+            </Button>
             <Button onClick={() => router.push('/sell')} className="gap-2">
               <Plus className="w-4 h-4" /> List a Painting
             </Button>

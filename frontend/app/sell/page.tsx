@@ -1,21 +1,37 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useState, useEffect, useRef } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { QRCodeSVG } from 'qrcode.react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
 import { toast } from 'sonner'
-import { createListing, getCategories, createCategory } from '@/lib/api'
+import { createListing, getCategories, createCategory, getUserProfile } from '@/lib/api'
 import { uploadImage } from '@/lib/storage'
 import { useAuth } from '@/context/AuthContext'
-import { Mic, MicOff, UploadCloud, X, Loader, Video } from 'lucide-react'
+import { Mic, MicOff, UploadCloud, X, Loader, Video, User } from 'lucide-react'
+import Link from 'next/link'
 
-export default function SellPage() {
+export default function SellPageWrapper() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    }>
+      <SellPage />
+    </Suspense>
+  )
+}
+
+function SellPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { user } = useAuth()
-  
+  const returnTo = searchParams.get('returnTo')
+  const [hasBio, setHasBio] = useState(true)
+
   const [viewState, setViewState] = useState<'form' | 'generating' | 'preview' | 'success'>('form')
 
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -50,6 +66,14 @@ export default function SellPage() {
     }
     fetchCats()
   }, [])
+
+  // Check if user has bio
+  useEffect(() => {
+    if (!user) return
+    getUserProfile(user.uid)
+      .then(p => setHasBio(!!p.bio))
+      .catch(() => {})
+  }, [user])
 
   // Init Speech Recognition
   useEffect(() => {
@@ -195,6 +219,11 @@ export default function SellPage() {
         images: imageUrls,
       })
       setSuccessData(product)
+      if (returnTo === 'live') {
+        toast.success('Product listed! Redirecting to Go Live...')
+        router.push(`/live/start?productId=${product.productId}`)
+        return
+      }
       setViewState('success')
       toast.success('Product listed successfully!')
     } catch (err: any) {
@@ -339,6 +368,19 @@ export default function SellPage() {
           <h1 className="text-3xl font-outfit font-bold uppercase text-foreground">List a Painting</h1>
           <p className="text-muted-foreground mt-2">Share your handcrafted artwork and let our AI generate a magical reel for it.</p>
         </div>
+
+        {/* Bio prompt */}
+        {!hasBio && user && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
+            <User className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-amber-800">Complete your profile to build trust with buyers</p>
+              <Link href="/profile" className="text-xs text-amber-600 hover:underline">
+                Add a bio &rarr;
+              </Link>
+            </div>
+          </div>
+        )}
 
         <Card className="rounded-xl shadow-sm border-border overflow-hidden">
           <form className="p-6 sm:p-8 space-y-6" onSubmit={handleProceedToReel}>
