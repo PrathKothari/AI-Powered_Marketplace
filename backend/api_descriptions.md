@@ -139,6 +139,84 @@ Full CRUD for paintings stored in the Firestore `products` collection. Any authe
 
 ---
 
+## Recommendation — `/api/v1/recommendation`
+
+Returns personalized painting recommendations as structured JSON. The endpoint uses cart items first, then past interactions, and falls back to trending/popular catalog items when no personalization signals are available.
+
+**Recommendation request schema**
+```json
+{
+  "userId": "string (optional)",
+  "cartItems": [
+    {
+      "productId": "string (optional)",
+      "title": "string (optional)",
+      "style": "string or [string] (optional)",
+      "theme": "string or [string] (optional)",
+      "artist": "string (optional)",
+      "colorPalette": "string or [string] (optional)",
+      "price": "float (optional)",
+      "priceRange": "string (optional)",
+      "interactionType": "string (optional)",
+      "rating": "float (optional)",
+      "reviewCount": "integer (optional)",
+      "stock": "integer (optional)"
+    }
+  ],
+  "pastInteractions": [
+    {
+      "productId": "string (optional)",
+      "title": "string (optional)",
+      "style": "string or [string] (optional)",
+      "theme": "string or [string] (optional)",
+      "artist": "string (optional)",
+      "colorPalette": "string or [string] (optional)",
+      "price": "float (optional)",
+      "priceRange": "string (optional)",
+      "interactionType": "viewed | liked | purchased | saved | clicked (optional)",
+      "rating": "float (optional)",
+      "reviewCount": "integer (optional)",
+      "stock": "integer (optional)"
+    }
+  ],
+  "catalogItems": "array of catalog items (optional; used for testing or custom sources)",
+  "excludeIds": ["string"],
+  "limit": 6
+}
+```
+
+**Recommendation response schema**
+```json
+{
+  "recommendations": [
+    {
+      "productId": "string",
+      "title": "string",
+      "style": "string (optional)",
+      "theme": "string (optional)",
+      "artist": "string (optional)",
+      "colorPalette": ["string"],
+      "priceRange": "string (optional)",
+      "price": "float (optional)",
+      "reason": "string (1 short sentence)"
+    }
+  ]
+}
+```
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/v1/recommendation/` | No | Health check for the recommendation module. Returns `{ "message": "Recommendation API ready" }`. |
+| `POST` | `/api/v1/recommendation/` | No | Generates 5-8 painting recommendations. Prioritizes cart similarity first, then past behavior, then popular/trending catalog items. Excludes items already in the cart or listed in `excludeIds`. Returns short reason text for each recommendation. |
+
+**POST /recommendation/ notes:**
+- If `cartItems` is present, matching styles, themes, artists, color palettes, and price range are weighted highest.
+- If `cartItems` is empty, `pastInteractions` drives the ranking.
+- If both are empty, the endpoint falls back to catalog popularity using rating, review count, and stock.
+- `limit` is constrained to `5` through `8`.
+
+---
+
 ## Reviews — `/api/v1/reviews`
 
 Manages customer reviews stored in the Firestore `reviews` collection. Posting a review automatically recomputes the product's average `rating` and `reviewCount`.
