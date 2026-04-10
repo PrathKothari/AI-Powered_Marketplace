@@ -27,6 +27,7 @@ This is the FastAPI backend for the AI-Powered Artisan Marketplace. It is design
    cp .env.example .env
    # Edit .env with your configuration
    ```
+   The backend reads .env.local first, then .env.
 4. Run the server:
    ```bash
    uvicorn app.main:app --reload
@@ -35,3 +36,31 @@ This is the FastAPI backend for the AI-Powered Artisan Marketplace. It is design
 ## Development
 - **Docs**: http://localhost:8000/docs
 - **Redoc**: http://localhost:8000/redoc
+
+## Storytelling APIs
+
+- POST /api/v1/storytelling/generate-video
+   - multipart form-data
+   - required: description, files
+   - optional: product_name, tone, audience, style_preset, duration_per_image
+
+- POST /api/v1/storytelling/generate-copy
+   - multipart form-data
+   - required: description
+   - optional: image_count, product_name, tone, audience, style_preset
+
+- GET /api/v1/storytelling/styles
+   - returns available creative presets
+
+## Included presets
+
+- museum_cinematic
+- artisan_story
+- editorial_premium
+- modern_minimal
+
+## Notes
+
+- If Google Cloud Storage credentials are configured, the rendered video is uploaded there.
+- Otherwise, the backend stores the file locally and serves it from /media/videos/...
+- The AI copy prompt is tuned for painting-inspired, cinematic product promos.
