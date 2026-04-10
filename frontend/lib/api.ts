@@ -262,3 +262,93 @@ export const verifyPayment = async (params: {
         token,
     })
 }
+
+// ─── User Profile (Bio) ─────────────────────────────────────────────────────
+
+export interface UserProfile {
+    uid: string
+    name: string
+    bio?: string | null
+    craftType?: string | null
+    region?: string | null
+    experienceYears?: number | null
+    languages?: string[] | null
+    photoUrl?: string | null
+}
+
+export interface UpdateProfilePayload {
+    bio?: string
+    craftType?: string
+    region?: string
+    experienceYears?: number
+    languages?: string[]
+    photoUrl?: string
+}
+
+export const updateUserProfile = async (payload: UpdateProfilePayload): Promise<any> => {
+    const token = getAuthToken()
+    if (!token) throw new Error('You must be logged in')
+    return fetchApi('/users/profile', { method: 'PATCH', data: payload, token })
+}
+
+export const getUserProfile = async (userId: string): Promise<UserProfile> => {
+    return fetchApi<UserProfile>(`/users/profile/${userId}`)
+}
+
+// ─── Live Streaming ──────────────────────────────────────────────────────────
+
+export interface LiveSession {
+    sessionId: string
+    userId: string
+    userName: string
+    title: string
+    description: string
+    productId: string
+    status: 'live' | 'ended'
+    viewerCount: number
+    hlsUrl?: string | null
+    recordingUrl?: string | null
+    thumbnailUrl?: string | null
+    startedAt: string
+    endedAt?: string | null
+    recentMessages?: ChatMessage[]
+}
+
+export interface ChatMessage {
+    messageId: string
+    sessionId: string
+    userId: string
+    userName: string
+    message: string
+    timestamp: string
+}
+
+export interface CreateSessionPayload {
+    title: string
+    description: string
+    productId: string
+}
+
+export const createLiveSession = async (payload: CreateSessionPayload): Promise<LiveSession> => {
+    const token = getAuthToken()
+    if (!token) throw new Error('You must be logged in to go live')
+    return fetchApi<LiveSession>('/live/sessions', { method: 'POST', data: payload, token })
+}
+
+export const getLiveSessions = async (): Promise<LiveSession[]> => {
+    try {
+        return await fetchApi<LiveSession[]>('/live/sessions')
+    } catch {
+        return []
+    }
+}
+
+export const getLiveSession = async (sessionId: string): Promise<LiveSession> => {
+    return fetchApi<LiveSession>(`/live/sessions/${sessionId}`)
+}
+
+export const endLiveSession = async (sessionId: string): Promise<LiveSession> => {
+    const token = getAuthToken()
+    if (!token) throw new Error('You must be logged in')
+    return fetchApi<LiveSession>(`/live/sessions/${sessionId}/end`, { method: 'PATCH', token })
+}

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { Suspense, useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Paintbrush, ArrowLeft, Eye, EyeOff, CheckCircle2, ShieldAlert } from 'lucide-react'
@@ -10,7 +10,19 @@ import { Card } from '@/components/ui/card'
 import { useAuth } from '@/context/AuthContext'
 import { toast } from 'sonner'
 
-export default function ResetPasswordPage() {
+export default function ResetPasswordPageWrapper() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    }>
+      <ResetPasswordPage />
+    </Suspense>
+  )
+}
+
+function ResetPasswordPage() {
   const { resetPassword } = useAuth()
   const searchParams = useSearchParams()
 

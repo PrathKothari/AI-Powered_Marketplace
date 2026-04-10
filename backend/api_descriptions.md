@@ -387,7 +387,36 @@ Generates product story copy and story videos for the frontend. The video pipeli
 
 ## Users — `/api/v1/users`
 
-Manages user profiles stored in Firestore `users` collection.
+Manages user profiles stored in the Firestore `users` collection. Any user can add a bio, craft type, region, experience, and languages to their profile. This info is displayed on product pages, live streams, and the user's public profile.
+
+**Public profile schema**
+```json
+{
+  "uid": "string (Firebase UID)",
+  "name": "string",
+  "bio": "string | null",
+  "craftType": "string | null (e.g. 'Warli Painting')",
+  "region": "string | null (Indian state)",
+  "experienceYears": "integer | null",
+  "languages": ["string"] | null
+}
+```
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `PATCH` | `/api/v1/users/profile` | **Yes** | Update the authenticated user's profile. Pass only fields to change. All fields are optional. Updates the Firestore `users` document. Returns the full updated profile. |
+| `GET` | `/api/v1/users/profile/{user_id}` | No | Get a user's public profile (name, bio, craft info). Returns `404` if user not found. |
+
+**PATCH /users/profile request body (all fields optional):**
+```json
+{
+  "bio": "Third-generation Madhubani artist from Mithila...",
+  "craftType": "Madhubani Painting",
+  "region": "Bihar",
+  "experienceYears": 15,
+  "languages": ["Hindi", "English", "Maithili"]
+}
+```
 
 ---
 
@@ -459,9 +488,157 @@ Tracks user interactions (views, likes, saves) for recommendations.
 
 ---
 
-## Live — `/api/v1/live`
+## Live Streaming — `/api/v1/live`
 
-Live artisan streaming features (under development).
+Naaptol-style live streaming where users broadcast themselves creating art. Viewers watch via HLS, chat in real-time, and buy the featured product. One product is featured per live session.
+
+### Architecture
+
+Uses a **MediaRecorder → WebSocket → FFmpeg → HLS** pipeline:
+
+```
+Streamer's Browser                    Server                         Viewer's Browser
+─────────────────                    ──────                         ────────────────
+getUserMedia()                                                      
+  → MediaRecorder                                                   
+    (webm VP8/Opus)                                                 
+    chunk every 500ms                                               
+      → WebSocket ──── binary ────→ FFmpeg                          
+                       chunks        (webm → HLS)                   
+                                      → stream.m3u8                 
+                                      → stream0.ts     ←── poll ─── hls.js video player
+                                      → stream1.ts                  
+                                      → ...                         
+                                                                    
+Chat WebSocket ←──── JSON ────→ Broadcast + Firestore ←── JSON ──→ Chat WebSocket
+```
+
+**Why not WebRTC peer-to-peer?** WebRTC requires a separate peer connection per viewer, which breaks beyond ~5 viewers. This pipeline scales to unlimited viewers since they just fetch HLS segments over HTTP.
+
+**Latency:** ~3-5 seconds (500ms recorder chunks + 2s HLS segments + player buffering). Chat is instant via WebSocket.
+
+**Tech stack:**
+- **MediaRecorder API** — Browser encodes camera as webm (VP8 video + Opus audio)
+- **WebSocket** — Binary transport from browser to server
+- **FFmpeg** — Transcodes webm → HLS (H.264/AAC, 2-second `.ts` segments, `-preset ultrafast -tune zerolatency`)
+- **FastAPI StaticFiles** — Serves HLS segments from temp directory at `/hls/{session_id}/`
+- **hls.js** — Client-side HLS player with low-latency configuration
+- **Firebase Storage** — Stores post-stream recordings as `.mp4` for replay/reels
+
+### REST Endpoints
+
+**Live session schema**
+```json
+{
+  "sessionId": "string (UUID)",
+  "userId": "string (Firebase UID of the streamer)",
+  "userName": "string",
+  "title": "string",
+  "description": "string",
+  "productId": "string (the single featured product)",
+  "status": "live | ended",
+  "viewerCount": "integer (count of active chat WebSocket connections)",
+  "hlsUrl": "string (/hls/{sessionId}/stream.m3u8 during stream; Firebase Storage URL after)",
+  "recordingUrl": "string | null (Firebase Storage URL after stream ends)",
+  "thumbnailUrl": "string | null (first image of the featured product)",
+  "startedAt": "datetime (ISO)",
+  "endedAt": "datetime (ISO) | null"
+}
+```
+
+**Chat message schema**
+```json
+{
+  "messageId": "string (UUID)",
+  "sessionId": "string",
+  "userId": "string",
+  "userName": "string",
+  "message": "string",
+  "timestamp": "datetime (ISO)"
+}
+```
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `POST` | `/api/v1/live/sessions` | **Yes** | Create a new live session. Validates that the product exists and belongs to the user. Creates a Firestore `live_sessions` document and prepares the HLS temp directory. Returns session data with `hlsUrl`. Status `201`. |
+| `GET` | `/api/v1/live/sessions` | No | List all sessions — live sessions first (sorted by `startedAt` desc), then recent ended sessions (sorted by `endedAt` desc). Up to 20 of each. Viewer counts are updated from in-memory state. Sorting is done in Python to avoid Firestore composite index requirements. |
+| `GET` | `/api/v1/live/sessions/{session_id}` | No | Get details for a specific session including the 50 most recent chat messages in `recentMessages`. Returns `404` if not found. |
+| `PATCH` | `/api/v1/live/sessions/{session_id}/end` | **Yes** | End a live session. Only the session owner can end it. Stops FFmpeg, concatenates `.ts` segments into `.mp4`, uploads to Firebase Storage, and updates the Firestore document with `recordingUrl`. Cleans up temp files. Returns `403` for non-owners, `400` if already ended. |
+
+**POST /live/sessions request body:**
+```json
+{
+  "title": "Making a Madhubani painting live",
+  "description": "Watch me create a traditional Mithila village scene",
+  "productId": "string (UUID of the product being showcased)"
+}
+```
+
+### WebSocket Endpoints
+
+| Path | Protocol | Data Format | Description |
+|------|----------|-------------|-------------|
+| `/api/v1/live/ws/{session_id}/stream` | WebSocket | **Binary** (webm chunks) | Stream ingestion endpoint for the streamer. The browser's `MediaRecorder` captures the camera as webm and sends binary chunks every 500ms. The server pipes these directly into FFmpeg's stdin, which outputs HLS segments. No text messages — purely binary data. |
+| `/api/v1/live/ws/{session_id}/chat` | WebSocket | **JSON** | Real-time chat for viewers and the streamer. Each message is broadcast to all connected clients and persisted to the Firestore `live_chat_messages` collection. Viewer count is tracked by active chat connections and updated in the session document. |
+
+**Stream WebSocket flow:**
+1. Browser opens WebSocket with `binaryType = 'arraybuffer'`
+2. `MediaRecorder` starts with `mimeType: 'video/webm;codecs=vp8,opus'` and `timeslice: 500ms`
+3. On each `ondataavailable` event, the webm `Blob` is sent as a binary WebSocket message
+4. Server writes each chunk to FFmpeg's stdin pipe
+5. FFmpeg outputs `.m3u8` + `.ts` files to the HLS temp directory
+6. On disconnect, FFmpeg stdin is closed and the process finalizes
+
+**Chat message format (chat WebSocket):**
+```json
+// Client → Server
+{ "userId": "string", "userName": "string", "message": "Beautiful work!" }
+
+// Server → All clients (broadcast)
+{
+  "messageId": "string (UUID)",
+  "sessionId": "string",
+  "userId": "string",
+  "userName": "string",
+  "message": "Beautiful work!",
+  "timestamp": "2026-04-11T10:30:00.000"
+}
+```
+
+### HLS Segment Serving
+
+During a live stream, HLS `.m3u8` playlists and `.ts` segments are served from a temp directory via a FastAPI static mount at `/hls/{session_id}/stream.m3u8` (note: mounted at server root, **not** under `/api/v1`). After the stream ends, `hlsUrl` in the session document points to the Firebase Storage recording URL.
+
+**FFmpeg HLS settings:**
+- Segment duration: 2 seconds (`-hls_time 2`)
+- Playlist window: 3 segments (`-hls_list_size 3`)
+- Old segments are deleted as new ones are written (`-hls_flags delete_segments+append_list`)
+- Video codec: H.264 ultrafast/zerolatency
+- Audio codec: AAC 128kbps
+
+### Recording Flow
+
+1. While streaming: FFmpeg writes 2-second `.ts` segments to a temp directory
+2. On stream end: the streamer's `MediaRecorder` stops → last chunk sent → WebSocket closes → FFmpeg stdin closes → FFmpeg finalizes
+3. All `.ts` files are concatenated into `recording.mp4` via `ffmpeg -f concat`
+4. The `.mp4` is uploaded to Firebase Storage at `live_recordings/{session_id}/recording.mp4`
+5. The public URL is saved as `recordingUrl` in the Firestore session document
+6. Temp files are cleaned up
+
+### Firestore Collections
+
+| Collection | Purpose |
+|------------|---------|
+| `live_sessions` | Active and archived live stream sessions |
+| `live_chat_messages` | Chat messages from live streams (persisted for replay) |
+
+### System Dependencies
+
+| Dependency | Purpose |
+|------------|---------|
+| `FFmpeg` | System binary — transcodes webm → HLS during stream, concatenates `.ts` → `.mp4` for recording |
+
+**Note:** `aiortc` and `av` are listed in `requirements.txt` but are no longer used by the streaming pipeline. The MediaRecorder approach eliminated the need for server-side WebRTC.
 
 ---
 
