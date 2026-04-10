@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -12,6 +14,17 @@ setup_logging()
 
 from app.core.firebase import init_firebase
 
+
+@asynccontextmanager
+async def lifespan(application: FastAPI):
+    """Start background services on app startup."""
+    # Telegram bot — uncomment to enable
+    # if settings.TELEGRAM_BOT_TOKEN:
+    #     from app.bot.main import start_bot_background
+    #     start_bot_background()
+    yield
+
+
 def create_application() -> FastAPI:
     """
     Initialize and configure the FastAPI application.
@@ -25,6 +38,7 @@ def create_application() -> FastAPI:
         description="Backend for KalaSetu Marketplace",
         version="0.1.0",
         redirect_slashes=False,
+        lifespan=lifespan,
     )
 
     # Set all CORS enabled origins
@@ -54,3 +68,4 @@ async def health_check():
     Health check endpoint.
     """
     return {"status": "ok", "project": settings.PROJECT_NAME}
+

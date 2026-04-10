@@ -61,13 +61,34 @@ export async function forgotPasswordApi(email: string): Promise<void> {
   }
 }
 
+export async function resetPasswordApi(oobCode: string, newPassword: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/auth/reset-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ oob_code: oobCode, new_password: newPassword }),
+  })
+  if (!res.ok) {
+    const data = await res.json()
+    throw new Error(data.detail || "Failed to reset password")
+  }
+}
+
 export async function logoutApi(): Promise<void> {
   const token = getToken()
-  if (!token) return
-  await fetch(`${API_BASE}/auth/logout`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
-  }).catch(() => {})
+  if (!token) {
+    console.warn("[Auth] logoutApi: No token found, skipping API call")
+    return
+  }
+  console.log("[Auth] logoutApi: Calling POST /auth/logout...")
+  try {
+    const res = await fetch(`${API_BASE}/auth/logout`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    console.log(`[Auth] logoutApi: Response status ${res.status}`)
+  } catch (err) {
+    console.error("[Auth] logoutApi: Network error", err)
+  }
 }
 
 // ─── Session storage ──────────────────────────────────────────────────────────
