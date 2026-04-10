@@ -101,9 +101,8 @@ def _clip_filter(
     return clip
 
 
-def _attach_music(video_path: Path) -> Path:
-    music_path = Path(settings.STORY_DEFAULT_MUSIC)
-    if not music_path.exists():
+def _attach_audio(video_path: Path, audio_path: str | None) -> Path:
+    if not audio_path or not Path(audio_path).exists():
         return video_path
 
     final_output = OUTPUT_DIR / f"{uuid.uuid4()}_final.mp4"
@@ -112,10 +111,8 @@ def _attach_music(video_path: Path) -> Path:
         "-y",
         "-i",
         str(video_path),
-        "-stream_loop",
-        "-1",
         "-i",
-        str(music_path),
+        str(audio_path),
         "-map",
         "0:v:0",
         "-map",
@@ -131,7 +128,7 @@ def _attach_music(video_path: Path) -> Path:
     return final_output
 
 
-def render_video(image_paths: List[str], creative: Dict[str, Any], duration_per_image: int | None = None) -> str:
+def render_video(image_paths: List[str], creative: Dict[str, Any], audio_path: str | None = None, duration_per_image: int | None = None) -> str:
     if not image_paths:
         raise ValueError("At least one product image is required")
 
@@ -206,10 +203,10 @@ def render_video(image_paths: List[str], creative: Dict[str, Any], duration_per_
     )
 
     subprocess.run(ffmpeg_args, check=True)
-    return str(_attach_music(base_output))
+    return str(_attach_audio(base_output, audio_path))
 
 
-def render_single_image_video(image_path: str, creative: Dict[str, Any], duration_per_image: int | None = None) -> str:
+def render_single_image_video(image_path: str, creative: Dict[str, Any], audio_path: str | None = None, duration_per_image: int | None = None) -> str:
     duration_seconds = max(int(duration_per_image or settings.STORY_SECONDS_PER_IMAGE), 1)
     fps = int(settings.STORY_VIDEO_FPS)
     source_path = str(Path(image_path).resolve())
@@ -247,4 +244,4 @@ def render_single_image_video(image_path: str, creative: Dict[str, Any], duratio
     )
     
     subprocess.run(ffmpeg_args, check=True)
-    return str(_attach_music(base_output))
+    return str(_attach_audio(base_output, audio_path))
