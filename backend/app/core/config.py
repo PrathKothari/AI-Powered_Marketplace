@@ -1,9 +1,12 @@
 from pathlib import Path
 from typing import List, Union
+from dotenv import load_dotenv
 from pydantic import AliasChoices, AnyHttpUrl, Field, field_validator
 from typing import Optional
 from pydantic import computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+load_dotenv(".env.local")
 
 class Settings(BaseSettings):
     """
@@ -25,6 +28,7 @@ class Settings(BaseSettings):
     # Video generation defaults
     STORY_SECONDS_PER_IMAGE: int = 4
     STORY_VIDEO_FPS: int = 30
+    TEMP_DIR: str = "temp"
     GEMINI_MODEL_NAME: str = Field(default="gemini-1.5-flash", validation_alias=AliasChoices("GEMINI_MODEL_NAME", "VERTEX_MODEL"))
     GOOGLE_CLOUD_LOCATION: str = Field(default="us-central1", validation_alias=AliasChoices("GOOGLE_CLOUD_LOCATION", "GCP_REGION"))
     GOOGLE_CLOUD_PROJECT: str = Field(default="", validation_alias=AliasChoices("GOOGLE_CLOUD_PROJECT", "GCP_PROJECT_ID"))

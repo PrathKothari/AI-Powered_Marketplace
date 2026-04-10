@@ -258,6 +258,51 @@ Two-step Razorpay payment flow: create a server-side order → open the Razorpay
 
 **Notes:**
 - Amount is in **paise** in Razorpay calls (1 INR = 100 paise). The backend converts INR → paise automatically.
+
+---
+
+## Storytelling — `/api/v1/storytelling`
+
+Generates product story copy and story videos for the frontend. The video pipeline accepts either uploaded image files or image URLs/local paths, then renders a short storytelling reel and returns the generated creative alongside the video URL.
+
+**Story video request schema**
+```json
+{
+  "description": "string",
+  "image_urls": ["string"],
+  "product_name": "string (optional)",
+  "tone": "premium",
+  "audience": "online shoppers",
+  "style_preset": "museum_cinematic",
+  "duration_per_image": 4
+}
+```
+
+**Story video response schema**
+```json
+{
+  "video_url": "string",
+  "local_path": "string (optional)",
+  "creative": {
+    "title": "string",
+    "hook": "string",
+    "main": "string",
+    "cta": "string",
+    "tagline": "string",
+    "music_mood": "string",
+    "style_notes": "string",
+    "visual_keywords": ["string"],
+    "scene_captions": ["string"]
+  }
+}
+```
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `POST` | `/api/v1/storytelling/generate` | No | Generates a full storytelling video from a JSON body. Frontend-friendly endpoint for the product story pipeline. `image_urls` may contain public URLs or local paths during development/testing. Returns the rendered video URL plus the generated creative. |
+| `POST` | `/api/v1/storytelling/generate-video` | No | Multipart upload version of the same pipeline. Accepts uploaded image files and the same story metadata as form fields. |
+| `POST` | `/api/v1/storytelling/generate-copy` | No | Generates only the story copy/creative from form fields. |
+| `GET` | `/api/v1/storytelling/styles` | No | Returns the available style presets used by the pipeline. |
 - Signature verification: `HMAC-SHA256(key=RAZORPAY_KEY_SECRET, msg="{order_id}|{payment_id}")`.
 
 ---

@@ -46,3 +46,10 @@ Thumbs.db
 .pytest_cache/
 .coverage
 htmlcov/
+service-account.json
+temp_uploads/
+temp_outputs/
+generated_media/
+scripts/smoke_test_storytelling.py
+temp/
+tests/
