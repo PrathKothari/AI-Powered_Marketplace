@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class StoryCreative(BaseModel):
@@ -19,6 +19,23 @@ class StoryVideoResponse(BaseModel):
     video_url: str
     local_path: Optional[str] = None
     creative: StoryCreative
+
+
+class StoryVideoRequest(BaseModel):
+    description: str
+    image_urls: List[str]
+    product_name: Optional[str] = None
+    tone: str = "premium"
+    audience: str = "online shoppers"
+    style_preset: str = "museum_cinematic"
+    duration_per_image: int = Field(default=4, ge=1, le=30)
+
+    @field_validator("image_urls")
+    @classmethod
+    def _validate_image_urls(cls, value: List[str]) -> List[str]:
+        if not value:
+            raise ValueError("At least one product image is required")
+        return value
 
 
 class StoryCopyRequest(BaseModel):
