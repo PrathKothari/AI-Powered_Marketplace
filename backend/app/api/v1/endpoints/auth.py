@@ -12,6 +12,7 @@ from app.schemas.auth import (
     LoginRequest,
     GoogleAuthRequest,
     ForgotPasswordRequest,
+    ResetPasswordRequest,
     AuthResponse,
     AuthUser,
 )
@@ -263,6 +264,48 @@ async def forgot_password(request: ForgotPasswordRequest):
 
 
 # ---------------------------------------------------------------------------
+# Reset Password (confirm with oobCode from email)
+# ---------------------------------------------------------------------------
+
+@router.post("/reset-password")
+async def reset_password(request: ResetPasswordRequest):
+    """
+    Confirms a password reset using the oobCode from the Firebase reset email.
+    First verifies the code, then resets the password.
+    """
+    api_key = settings.FIREBASE_API_KEY
+    if not api_key:
+        raise HTTPException(status_code=500, detail="FIREBASE_API_KEY not configured")
+
+    async with httpx.AsyncClient() as client:
+        # Step 1: Verify the oobCode is valid
+        verify_resp = await client.post(
+            f"{IDENTITY_TOOLKIT_URL}:resetPassword?key={api_key}",
+            json={"oobCode": request.oob_code},
+        )
+        if verify_resp.status_code != 200:
+            error_msg = verify_resp.json().get("error", {}).get("message", "Invalid or expired reset code")
+            logger.warning("Reset password verify failed: %s", error_msg)
+            raise HTTPException(status_code=400, detail=error_msg)
+
+        # Step 2: Confirm the reset with the new password
+        confirm_resp = await client.post(
+            f"{IDENTITY_TOOLKIT_URL}:resetPassword?key={api_key}",
+            json={
+                "oobCode": request.oob_code,
+                "newPassword": request.new_password,
+            },
+        )
+        if confirm_resp.status_code != 200:
+            error_msg = confirm_resp.json().get("error", {}).get("message", "Failed to reset password")
+            logger.warning("Reset password confirm failed: %s", error_msg)
+            raise HTTPException(status_code=400, detail=error_msg)
+
+    logger.info("Password reset confirmed successfully")
+    return {"message": "Password has been reset successfully"}
+
+
+# ---------------------------------------------------------------------------
 # Get Current User
 # ---------------------------------------------------------------------------
 
@@ -290,6 +333,7 @@ async def logout():
     Stateless logout — the client removes the token from storage.
     A future improvement would store a token blacklist in Firestore.
     """
+    logger.info("Logout endpoint called")
     return {"message": "Logged out successfully"}
 
 

@@ -9,6 +9,7 @@ import {
   registerApi,
   googleLoginApi,
   forgotPasswordApi,
+  resetPasswordApi,
   logoutApi,
   storeSession,
   clearSession,
@@ -22,6 +23,7 @@ interface AuthContextValue {
   register: (name: string, email: string, password: string) => Promise<void>
   loginWithGoogle: (credential: string) => Promise<void>
   forgotPassword: (email: string) => Promise<void>
+  resetPassword: (oobCode: string, newPassword: string) => Promise<void>
   logout: () => Promise<void>
 }
 
@@ -67,15 +69,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await forgotPasswordApi(email)
   }
 
+  const resetPassword = async (oobCode: string, newPassword: string) => {
+    await resetPasswordApi(oobCode, newPassword)
+  }
+
   const logout = async () => {
+    console.log('[Auth] logout: Starting sign out flow...')
     await logoutApi()
     clearSession()
     setAuthUser(null)
     dispatch(setUser(null))
+    console.log('[Auth] logout: Session cleared, user set to null')
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, loginWithGoogle, forgotPassword, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, loginWithGoogle, forgotPassword, resetPassword, logout }}>
       {children}
     </AuthContext.Provider>
   )

@@ -14,6 +14,7 @@ from app.api.v1.endpoints import (
     reviews,
     orders,
     payments,
+    chat,
 )
 
 api_router = APIRouter()
@@ -32,3 +33,4 @@ api_router.include_router(categories.router, prefix="/categories", tags=["Catego
 api_router.include_router(reviews.router, prefix="/reviews", tags=["Reviews"])
 api_router.include_router(orders.router, prefix="/orders", tags=["Orders"])
 api_router.include_router(payments.router, prefix="/payments", tags=["Payments"])
+api_router.include_router(chat.router, prefix="/chat", tags=["Chat"])
