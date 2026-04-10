@@ -9,7 +9,7 @@ import base64
 import logging
 from typing import Any, Dict, List
 
-from google import genai
+import google.generativeai as genai
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from firebase_admin import firestore as fa_firestore
 from pinecone import Pinecone
