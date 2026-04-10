@@ -17,7 +17,7 @@ def create_application() -> FastAPI:
     Initialize and configure the FastAPI application.
     """
     # Initialize Firebase Admin SDK
-    init_firebase()
+    # init_firebase()
     application = FastAPI(
         title=settings.PROJECT_NAME,
         openapi_url=f"{settings.API_V1_STR}/openapi.json",
