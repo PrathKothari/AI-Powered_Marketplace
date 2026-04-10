@@ -5,6 +5,7 @@ import { Inter, Outfit } from 'next/font/google'
 import Providers from '@/store/provider'
 import { CartProvider } from '@/context/CartContext'
 import { AuthProvider } from '@/context/AuthContext'
+import ChatWidget from '@/components/chat-widget'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' })
 const outfit = Outfit({ subsets: ['latin'], variable: '--font-outfit' })
@@ -26,6 +27,7 @@ export default function RootLayout({
           <AuthProvider>
             <CartProvider>
               {children}
+              <ChatWidget />
             </CartProvider>
           </AuthProvider>
         </Providers>

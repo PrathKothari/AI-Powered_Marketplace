@@ -32,6 +32,22 @@ class ForgotPasswordRequest(BaseModel):
     email: EmailStr
 
 
+class ResetPasswordRequest(BaseModel):
+    oob_code: str = Field(..., description="The oobCode from the Firebase password reset email link")
+    new_password: str = Field(..., min_length=8)
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_new_password_strength(cls, v: str) -> str:
+        if not re.search(r"[A-Z]", v):
+            raise ValueError("Password must contain at least one uppercase letter")
+        if not re.search(r"\d", v):
+            raise ValueError("Password must contain at least one number")
+        if not re.search(r'[!@#$%^&*()\-_=+\[\]{};:\'",.<>/?\\|`~]', v):
+            raise ValueError("Password must contain at least one special character")
+        return v
+
+
 class AuthUser(BaseModel):
     uid: str
     email: str
