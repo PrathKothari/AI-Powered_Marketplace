@@ -134,7 +134,12 @@ def render_video(image_paths: List[str], creative: Dict[str, Any], audio_path: s
 
     if len(image_paths) == 1:
         # If only one image, just do the basic clip filter and output
-        return render_single_image_video(image_paths[0], creative, duration_per_image)
+        return render_single_image_video(
+            image_paths[0],
+            creative,
+            audio_path=audio_path,
+            duration_per_image=duration_per_image,
+        )
 
     duration_seconds = max(int(duration_per_image or settings.STORY_SECONDS_PER_IMAGE), 1)
     fps = int(settings.STORY_VIDEO_FPS)

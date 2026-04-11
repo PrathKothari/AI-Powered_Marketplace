@@ -31,7 +31,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!user) return
-    getUserProfile(user.uid).then(p => setPhotoUrl(p.photoUrl || null)).catch(() => {})
+    getUserProfile(user.uid).then(p => setPhotoUrl(p?.photoUrl || null)).catch(() => {})
     Promise.all([getOrders(), getSellerOrders(), getMyListings()]).then(([o, so, l]) => {
       setOrders(o)
       setSellerOrders(so)

@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
 import { toast } from 'sonner'
-import { createListing, getCategories, createCategory, getUserProfile } from '@/lib/api'
+import { createListing, getCategories, createCategory, getUserProfile, generateStoryVideo } from '@/lib/api'
 import { uploadImage } from '@/lib/storage'
 import { useAuth } from '@/context/AuthContext'
 import { Mic, MicOff, UploadCloud, X, Loader, Video, User } from 'lucide-react'
@@ -44,6 +44,11 @@ function SellPage() {
   const [uploadingImages, setUploadingImages] = useState(false)
   const [imageFiles, setImageFiles] = useState<File[]>([])
 
+  // Generated reel video state
+  const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string>('')
+  const [uploadedImageUrls, setUploadedImageUrls] = useState<string[]>([])
+  const [generationError, setGenerationError] = useState<string>('')
+
   const [formData, setFormData] = useState({
     title: '',
     price: '',
@@ -71,7 +76,7 @@ function SellPage() {
   useEffect(() => {
     if (!user) return
     getUserProfile(user.uid)
-      .then(p => setHasBio(!!p.bio))
+      .then(p => setHasBio(!!p?.bio))
       .catch(() => {})
   }, [user])
 
@@ -154,7 +159,7 @@ function SellPage() {
     }))
   }
 
-  const handleProceedToReel = (e: React.FormEvent) => {
+  const handleProceedToReel = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!user) {
       toast.error('Please sign in to list a product')
@@ -169,19 +174,36 @@ function SellPage() {
       toast.error('Please attach at least one image.')
       return
     }
-    setViewState('generating')
-  }
 
-  // Handle AI Loading Delay
-  useEffect(() => {
-    if (viewState === 'generating') {
-      const timer = setTimeout(() => {
-        setViewState('preview')
-        toast.success("AI Craft Reel Generated!")
-      }, 4000)
-      return () => clearTimeout(timer)
+    setGenerationError('')
+    setViewState('generating')
+
+    try {
+      // Step 1: Upload images to Firebase Storage (needed for both the reel pipeline and the final listing)
+      const imageUrls = await Promise.all(imageFiles.map(f => uploadImage(f)))
+      setUploadedImageUrls(imageUrls)
+
+      // Step 2: Call the storytelling API to generate the reel
+      const result = await generateStoryVideo({
+        description: formData.description,
+        image_urls: imageUrls,
+        product_name: formData.title,
+        tone: 'premium',
+        audience: 'online shoppers',
+        style_preset: 'museum_cinematic',
+        duration_per_image: 4,
+      })
+
+      setGeneratedVideoUrl(result.video_url)
+      setViewState('preview')
+      toast.success('AI Craft Reel Generated!')
+    } catch (err: any) {
+      console.error('Reel generation failed:', err)
+      setGenerationError(err.message || 'Reel generation failed')
+      toast.error(err.message || 'Reel generation failed')
+      setViewState('form')
     }
-  }, [viewState])
+  }
 
   const handleFinalPublish = async () => {
     setIsSubmitting(true)
@@ -196,18 +218,21 @@ function SellPage() {
         }
       }
 
-      // Upload images to Firebase Storage, get permanent URLs
-      setUploadingImages(true)
-      let imageUrls: string[] = []
-      try {
-        imageUrls = await Promise.all(imageFiles.map(f => uploadImage(f)))
-      } catch (err) {
-        toast.error('Image upload failed. Please try again.')
-        setIsSubmitting(false)
+      // Images were already uploaded during reel generation — reuse those URLs.
+      // Fallback: if somehow empty, upload now.
+      let imageUrls = uploadedImageUrls
+      if (imageUrls.length === 0) {
+        setUploadingImages(true)
+        try {
+          imageUrls = await Promise.all(imageFiles.map(f => uploadImage(f)))
+        } catch (err) {
+          toast.error('Image upload failed. Please try again.')
+          setIsSubmitting(false)
+          setUploadingImages(false)
+          return
+        }
         setUploadingImages(false)
-        return
       }
-      setUploadingImages(false)
 
       const product = await createListing({
         title: formData.title,
@@ -217,6 +242,7 @@ function SellPage() {
         region: formData.region,
         materials: formData.materials,
         images: imageUrls,
+        storyVideo: generatedVideoUrl,
       })
       setSuccessData(product)
       if (returnTo === 'live') {
@@ -285,14 +311,19 @@ function SellPage() {
              <p className="text-muted-foreground text-sm">This AI-generated reel will be displayed on your product page to uniquely showcase your story to buyers.</p>
           </div>
           
-          <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden flex items-center justify-center shadow-md border border-border">
-             <video 
-                src="https://videos.pexels.com/video-files/4491295/4491295-sd_640_360_25fps.mp4" 
-                controls 
-                autoPlay 
-                loop 
-                className="w-full h-full object-cover"
-             />
+          <div className="relative w-full aspect-[9/16] max-h-[60vh] bg-black rounded-lg overflow-hidden flex items-center justify-center shadow-md border border-border mx-auto">
+             {generatedVideoUrl ? (
+               <video
+                  src={generatedVideoUrl.startsWith('/') ? `${process.env.NEXT_PUBLIC_API_URL?.replace('/api/v1', '') || 'http://localhost:8001'}${generatedVideoUrl}` : generatedVideoUrl}
+                  controls
+                  autoPlay
+                  loop
+                  playsInline
+                  className="w-full h-full object-contain"
+               />
+             ) : (
+               <p className="text-white text-sm">No video available</p>
+             )}
           </div>
 
           <div className="flex gap-4 pt-4">

@@ -1,24 +1,35 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { ReactNode, useEffect, useState } from 'react'
 import { getUserProfile, type UserProfile } from '@/lib/api'
 import { User, MapPin, Palette, Clock } from 'lucide-react'
 
 interface SellerBioProps {
   userId: string
   userName?: string
+  fallback?: ReactNode
 }
 
-export default function SellerBio({ userId, userName }: SellerBioProps) {
+export default function SellerBio({ userId, userName, fallback = null }: SellerBioProps) {
   const [profile, setProfile] = useState<UserProfile | null>(null)
+  const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
-    if (!userId) return
-    getUserProfile(userId).then(setProfile).catch(() => {})
+    if (!userId) {
+      setLoaded(true)
+      return
+    }
+    getUserProfile(userId)
+      .then(p => setProfile(p))
+      .catch(() => {})
+      .finally(() => setLoaded(true))
   }, [userId])
 
-  // Don't show if no bio
-  if (!profile?.bio) return null
+  // While loading, render nothing to avoid flicker between fallback and real bio
+  if (!loaded) return null
+
+  // No bio set — render the fallback (basic artisan card) if provided
+  if (!profile?.bio) return <>{fallback}</>
 
   return (
     <div className="rounded-xl border border-border bg-white p-4 space-y-3">

@@ -5,6 +5,7 @@ export type Product = {
   images: string[]
   description: string
   status: 'in-stock' | 'low-stock' | 'out-of-stock'
+  artisanId?: string
   artisan: {
     name: string
     location: string
