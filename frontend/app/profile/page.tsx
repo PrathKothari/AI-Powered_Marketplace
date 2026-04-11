@@ -40,10 +40,12 @@ export default function ProfilePage() {
     if (!user) return
     getUserProfile(user.uid)
       .then(profile => {
-        setBio(profile.bio || '')
-        setRegion(profile.region || '')
-        setExperienceYears(profile.experienceYears ? String(profile.experienceYears) : '')
-        setPhotoUrl(profile.photoUrl || null)
+        if (profile) {
+          setBio(profile.bio || '')
+          setRegion(profile.region || '')
+          setExperienceYears(profile.experienceYears ? String(profile.experienceYears) : '')
+          setPhotoUrl(profile.photoUrl || null)
+        }
         setBioLoaded(true)
       })
       .catch(() => setBioLoaded(true))

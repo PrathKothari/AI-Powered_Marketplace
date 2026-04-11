@@ -19,9 +19,9 @@ from app.core.firebase import init_firebase
 async def lifespan(application: FastAPI):
     """Start background services on app startup."""
     # Telegram bot — uncomment to enable
-    # if settings.TELEGRAM_BOT_TOKEN:
-    #     from app.bot.main import start_bot_background
-    #     start_bot_background()
+    if settings.TELEGRAM_BOT_TOKEN:
+        from app.bot.main import start_bot_background
+        start_bot_background()
     yield
 
 
@@ -30,7 +30,7 @@ def create_application() -> FastAPI:
     Initialize and configure the FastAPI application.
     """
     # Initialize Firebase Admin SDK
-    # init_firebase()
+    init_firebase()
     application = FastAPI(
         title=settings.PROJECT_NAME,
         openapi_url=f"{settings.API_V1_STR}/openapi.json",

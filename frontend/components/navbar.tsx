@@ -23,7 +23,7 @@ export default function Navbar() {
   // Fetch profile photo
   useEffect(() => {
     if (!user) { setPhotoUrl(null); return }
-    getUserProfile(user.uid).then(p => setPhotoUrl(p.photoUrl || null)).catch(() => {})
+    getUserProfile(user.uid).then(p => setPhotoUrl(p?.photoUrl || null)).catch(() => {})
   }, [user])
 
   // Close user dropdown on outside click

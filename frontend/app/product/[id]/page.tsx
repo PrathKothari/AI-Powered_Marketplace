@@ -11,8 +11,8 @@ import { toast } from 'sonner'
 import { useCart } from '@/context/CartContext'
 import { Product } from '@/lib/types/product'
 import { getCatalogProducts, getProductReviews, addProductReview } from '@/lib/api'
-import ProductCard from '@/components/product-card'
 import SellerBio from '@/components/SellerBio'
+import RecommendationsSection from '@/components/RecommendationsSection'
 
 export default function ProductPage() {
   const router = useRouter()
@@ -50,9 +50,11 @@ export default function ProductPage() {
           return 'in-stock'
         })(),
         stock: doc.stock,
-        artisan: { name: doc.artisanId ?? 'Unknown Artisan', location: doc.region ?? '', avatar: '' },
+        artisanId: doc.artisanId ?? '',
+        artisan: { name: doc.artisanName ?? 'Unknown Artisan', location: doc.region ?? '', avatar: '' },
         category: doc.craftType ?? '',
         rating: doc.rating ?? 0,
+        storyVideo: doc.storyVideo || '',
         relatedProducts: [],
       }))
       setAllProducts(products)
@@ -99,21 +101,18 @@ export default function ProductPage() {
       .filter((p: Product | undefined): p is Product => Boolean(p))
   }, [product, allProducts])
 
-  const recommendedCategoryProducts = useMemo<Product[]>(() => {
-    if (!product || allProducts.length === 0) return []
-    
-    // Filter by same category, excluding the current product
-    const sameCategory = allProducts.filter(p => p.category === product.category && String(p.id) !== String(product.id))
-    
-    // If none found in same category, use first 3 from allProducts (excluding current product)
-    if (sameCategory.length === 0) {
-       return allProducts.filter(p => String(p.id) !== String(product.id)).slice(0, 3)
-    }
-    
-    return sameCategory.slice(0, 3)
-  }, [product, allProducts])
-
-  const storyVideo = product?.storyVideo || 'https://www.w3schools.com/html/mov_bbb.mp4'
+  // Only show the story video if the product actually has one (uploaded to our storage).
+  // Filter out stale/mock URLs (blob: URLs, external placeholders, etc.)
+  const rawStoryVideo = product?.storyVideo || ''
+  const isValidStoryVideo =
+    rawStoryVideo.length > 0 &&
+    !rawStoryVideo.startsWith('blob:') &&
+    !rawStoryVideo.includes('w3schools.com') &&
+    !rawStoryVideo.includes('pexels.com')
+  const API_ROOT = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001/api/v1').replace(/\/api\/v1$/, '')
+  const storyVideo = isValidStoryVideo
+    ? (rawStoryVideo.startsWith('/') ? `${API_ROOT}${rawStoryVideo}` : rawStoryVideo)
+    : ''
 
   const handleAddToCart = () => {
     if (!product) return
@@ -165,29 +164,34 @@ export default function ProductPage() {
               <p className="text-lg font-semibold text-primary mb-2">₹{product.price.toFixed(0)}</p>
               <p className="text-sm text-muted-foreground mb-4">{product.description}</p>
 
-              {/* Artisan Info */}
-              <div className="flex items-center gap-3 mb-5 p-3 rounded-lg bg-slate-50 border border-slate-100">
-                <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold uppercase flex-shrink-0">
-                  {product.artisan.name.charAt(0)}
+              {/* Seller Bio (falls back to basic artisan card if no bio set) */}
+              {product.artisanId ? (
+                <SellerBio
+                  userId={product.artisanId}
+                  userName={product.artisan.name}
+                  fallback={
+                    <div className="flex items-center gap-3 mb-5 p-3 rounded-lg bg-slate-50 border border-slate-100">
+                      <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold uppercase flex-shrink-0">
+                        {product.artisan.name.charAt(0)}
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-slate-800">{product.artisan.name}</p>
+                        <p className="text-xs text-muted-foreground">{product.artisan.location}</p>
+                      </div>
+                    </div>
+                  }
+                />
+              ) : (
+                <div className="flex items-center gap-3 mb-5 p-3 rounded-lg bg-slate-50 border border-slate-100">
+                  <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold uppercase flex-shrink-0">
+                    {product.artisan.name.charAt(0)}
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-slate-800">{product.artisan.name}</p>
+                    <p className="text-xs text-muted-foreground">{product.artisan.location}</p>
+                  </div>
                 </div>
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-slate-800">{product.artisan.name}</p>
-                  <p className="text-xs text-muted-foreground">{product.artisan.location}</p>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                    ✓ Verified Artisan
-                  </span>
-                  {(product.rating ?? 0) > 4 && (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-                      ⭐ Top Artisan
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Seller Bio */}
-              <SellerBio userId={product.artisan.name} />
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 {product.images?.map((img: string, index: number) => (
@@ -201,16 +205,21 @@ export default function ProductPage() {
               </div>
             </div>
 
-            <div className="rounded-xl bg-white p-5 shadow-sm border border-border">
-              <h2 className="text-2xl font-semibold mb-4">Craft Story Video</h2>
-              {storyVideo ? (
-                <video src={storyVideo} controls className="w-full rounded-xl shadow" />
-              ) : (
-                <div className="h-60 flex items-center justify-center bg-muted rounded-xl">
-                  <p className="text-muted-foreground">Story not available</p>
+            {storyVideo && (
+              <div className="rounded-xl bg-white p-5 shadow-sm border border-border">
+                <h2 className="text-2xl font-semibold mb-4">Craft Story Video</h2>
+                <div className="flex justify-center">
+                  <div className="w-full max-w-[280px] aspect-[9/16] rounded-xl overflow-hidden shadow-md bg-black">
+                    <video
+                      src={storyVideo}
+                      controls
+                      playsInline
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
 
             {/* Ratings & Reviews (Dynamic UI) */}
             <div className="rounded-xl bg-white p-5 shadow-sm border border-border">
@@ -304,6 +313,15 @@ export default function ProductPage() {
                 </div>
               </div>
             )}
+
+            <div className="rounded-xl bg-white p-5 shadow-sm border border-border">
+              <RecommendationsSection
+                title="You might also like"
+                subtitle="AI-curated picks based on this painting and your cart"
+                excludeIds={[productId]}
+                limit={6}
+              />
+            </div>
           </div>
 
           <aside className="space-y-6">
@@ -335,16 +353,6 @@ export default function ProductPage() {
               </div>
             </Card>
           </aside>
-        </div>
-
-        {/* You may also like Section */}
-        <div className="mt-20">
-          <h2 className="text-2xl font-bold text-slate-900 mb-8 border-b border-border pb-4">You may also like</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-            {recommendedCategoryProducts.map((p) => (
-              <ProductCard key={p.id} product={p as Product} onDeleteAction={() => {}} />
-            ))}
-          </div>
         </div>
       </div>
     </div>

@@ -8,15 +8,19 @@ import type { LiveSession } from '@/lib/api'
 
 export default function LiveSessionCard({ session }: { session: LiveSession }) {
   const isLive = session.status === 'live'
+  // Ignore stale blob: URLs (browser-local temp URLs that no longer exist)
+  const validThumbnail = session.thumbnailUrl && !session.thumbnailUrl.startsWith('blob:')
+    ? session.thumbnailUrl
+    : null
 
   return (
     <Link href={`/live/${session.sessionId}`}>
       <Card className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer group bg-white">
         {/* Thumbnail */}
         <div className="relative aspect-video bg-slate-100">
-          {session.thumbnailUrl ? (
+          {validThumbnail ? (
             <img
-              src={session.thumbnailUrl}
+              src={validThumbnail}
               alt={session.title}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
             />
