@@ -208,15 +208,13 @@ export default function ProductPage() {
             {storyVideo && (
               <div className="rounded-xl bg-white p-5 shadow-sm border border-border">
                 <h2 className="text-2xl font-semibold mb-4">Craft Story Video</h2>
-                <div className="flex justify-center">
-                  <div className="w-full max-w-[280px] aspect-[9/16] rounded-xl overflow-hidden shadow-md bg-black">
-                    <video
-                      src={storyVideo}
-                      controls
-                      playsInline
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
+                <div className="w-full aspect-video rounded-xl overflow-hidden shadow-md bg-black">
+                  <video
+                    src={storyVideo}
+                    controls
+                    playsInline
+                    className="w-full h-full object-contain"
+                  />
                 </div>
               </div>
             )}
