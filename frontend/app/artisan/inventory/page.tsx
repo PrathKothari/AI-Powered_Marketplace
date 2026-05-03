@@ -1,3 +1,6 @@
+'use client'
+
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -18,6 +21,8 @@ const mockData: ProductInventory[] = [
 ]
 
 export default function SmartInventoryPage() {
+  const router = useRouter()
+
   return (
     <div className="container mx-auto p-6 space-y-8 max-w-7xl animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Header */}
@@ -26,7 +31,7 @@ export default function SmartInventoryPage() {
           <h1 className="text-3xl font-bold tracking-tight">Smart Inventory Insights</h1>
           <p className="text-muted-foreground mt-1">AI-powered demand forecasting for your products</p>
         </div>
-        <Button className="gap-2">
+        <Button className="gap-2" onClick={() => router.push("/analytics") }>
           View Detailed Analytics
           <ArrowRight className="w-4 h-4" />
         </Button>

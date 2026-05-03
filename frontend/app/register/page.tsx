@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useDispatch } from 'react-redux'
 import { setUser } from '@/store/slices/userSlice'
 import { Button } from '@/components/ui/button'
@@ -12,15 +12,23 @@ import Link from 'next/link'
 export default function RegisterPage() {
   const router = useRouter()
   const dispatch = useDispatch()
-  const searchParams = useSearchParams()
-  const initialRole = (searchParams.get('role') as 'buyer' | 'artisan') || 'buyer'
 
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
-    role: initialRole
+    role: 'buyer' as 'buyer' | 'artisan' | 'both'
   })
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const roleParam = params.get('role') as 'buyer' | 'artisan'
+
+    if (roleParam) {
+      setFormData((prev) => ({ ...prev, role: roleParam }))
+    }
+  }, [])
 
   const [isLoading, setIsLoading] = useState(false)
 
@@ -56,7 +64,7 @@ export default function RegisterPage() {
       <Card className="w-full max-w-md p-8 shadow-xl border-border space-y-6">
         <div className="text-center">
           <h1 className="text-3xl font-bold text-foreground">Create Account</h1>
-          <p className="text-muted-foreground mt-2">Join CraftHub today</p>
+          <p className="text-muted-foreground mt-2">Join KalaSetu today</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -77,15 +85,20 @@ export default function RegisterPage() {
 
           <div className="space-y-3 pt-2">
             <label className="text-sm font-medium">I want to:</label>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <label className={`border rounded-lg p-4 cursor-pointer transition-all ${formData.role === 'buyer' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'hover:bg-muted'}`}>
                 <input type="radio" name="role" value="buyer" className="hidden" checked={formData.role === 'buyer'} onChange={handleChange} />
                 <div className="font-semibold text-center mt-1">Buy Products</div>
               </label>
-              
+
               <label className={`border rounded-lg p-4 cursor-pointer transition-all ${formData.role === 'artisan' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'hover:bg-muted'}`}>
                 <input type="radio" name="role" value="artisan" className="hidden" checked={formData.role === 'artisan'} onChange={handleChange} />
                 <div className="font-semibold text-center mt-1">Sell Products</div>
+              </label>
+
+              <label className={`border rounded-lg p-4 cursor-pointer transition-all ${formData.role === 'both' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'hover:bg-muted'}`}>
+                <input type="radio" name="role" value="both" className="hidden" checked={formData.role === 'both'} onChange={handleChange} />
+                <div className="font-semibold text-center mt-1">Buy & Sell</div>
               </label>
             </div>
           </div>

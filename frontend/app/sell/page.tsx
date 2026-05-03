@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { QRCodeSVG } from 'qrcode.react'
+import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
@@ -79,7 +80,7 @@ export default function SellPage() {
                  </svg>
               </div>
               <h2 className="text-3xl font-bold text-foreground">Product Published!</h2>
-              <p className="text-muted-foreground">Your product is now listed on CraftHub.</p>
+              <p className="text-muted-foreground">Your product is now listed on KalaSetu.</p>
             </div>
 
             <div className="p-6 border-2 border-primary/20 bg-primary/5 rounded-xl shadow-inner relative overflow-hidden">
@@ -90,7 +91,7 @@ export default function SellPage() {
                     <span className="text-primary">✨</span> Digital Authenticity Card
                 </h3>
                 
-                <div className="flex justify-center bg-white p-4 rounded-xl shadow-md inline-block mx-auto relative z-10 hover:scale-105 transition-transform">
+                <div className="inline-flex justify-center bg-white p-4 rounded-xl shadow-md mx-auto relative z-10 hover:scale-105 transition-transform">
                     <QRCodeSVG id="qr-code-svg" value={`http://localhost:3000/product/${successData.id}`} size={180} level={"H"} />
                 </div>
                 
@@ -173,10 +174,14 @@ export default function SellPage() {
 
                 <div className="pt-6 border-t mt-6">
                   <Button disabled={isSubmitting} type="submit" className="w-full py-6 text-lg shadow-lg font-bold">
-                      {isSubmitting ? 'Publishing...' : 'Publish Product'}
+                      {isSubmitting ? (
+                        <span className="flex items-center gap-2">
+                           <Loader2 className="w-5 h-5 animate-spin" /> Publishing...
+                        </span>
+                      ) : 'Publish Product'}
                   </Button>
                 </div>
-            </form>
+              </form>
           </Card>
       </div>
     </main>

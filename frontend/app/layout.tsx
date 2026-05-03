@@ -8,7 +8,7 @@ import { CartProvider } from '@/context/CartContext'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Artisan Marketplace',
+  title: 'KalaSetu',
   description: 'Discover authentic handmade crafts',
 }
 

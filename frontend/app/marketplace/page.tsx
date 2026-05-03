@@ -1,19 +1,43 @@
 'use client'
 
+
 import { useState, useMemo, useEffect } from 'react'
 import Navbar from "@/components/navbar"
 import FilterSidebar from "@/components/filter-sidebar"
 import ProductCard from "@/components/product-card"
 import { Product } from "@/lib/types/product"
 import { getProducts } from "@/lib/products"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
+import { ShoppingBag } from "lucide-react"
+import { Button } from "@/components/ui/button"
+
+interface MarketplaceFilters {
+  categories: string[]
+  priceRange: [number, number]
+  availability: string[]
+  rating: number
+}
 
 export default function MarketplacePage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [sortBy, setSortBy] = useState("popular")
   const [rawProducts, setRawProducts] = useState<Product[]>([])
+  const [filters, setFilters] = useState<MarketplaceFilters>({
+    categories: [],
+    priceRange: [0, 1000],
+    availability: [],
+    rating: 0,
+  })
+
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    setRawProducts(getProducts());
+    const timer = setTimeout(() => {
+      setRawProducts(getProducts())
+      setIsLoading(false)
+    }, 1000)
+    return () => clearTimeout(timer)
   }, [])
 
   const filteredProducts = useMemo(() => {
@@ -25,6 +49,27 @@ export default function MarketplacePage() {
       )
     }
 
+    if (filters.categories.length > 0) {
+      products = products.filter((p) =>
+        p.category ? filters.categories.includes(p.category) : false
+      )
+    }
+
+    if (filters.availability.length > 0) {
+      products = products.filter((p) => {
+        const status = p.status === 'out-of-stock' ? 'Out of Stock' : 'In Stock'
+        return filters.availability.includes(status)
+      })
+    }
+
+    if (filters.rating > 0) {
+      products = products.filter((p) => (p.rating ?? 0) >= filters.rating)
+    }
+
+    products = products.filter(
+      (p) => p.price >= filters.priceRange[0] && p.price <= filters.priceRange[1]
+    )
+
     if (sortBy === "price-low") {
       products.sort((a, b) => a.price - b.price)
     } else if (sortBy === "price-high") {
@@ -32,17 +77,17 @@ export default function MarketplacePage() {
     }
 
     return products
-  }, [searchQuery, sortBy])
+  }, [searchQuery, sortBy, rawProducts, filters])
 
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
 
-      <div className="flex max-w-7xl mx-auto px-6 py-8 gap-6">
+      <div className="flex flex-col lg:flex-row max-w-7xl mx-auto px-3 sm:px-6 py-6 sm:py-8 gap-6 w-full overflow-x-hidden">
 
         {/* Sidebar */}
-        <div className="w-64 hidden lg:block">
-          <FilterSidebar />
+        <div className="w-full lg:w-64 mb-6 lg:mb-0 lg:block">
+          <FilterSidebar onFilterChange={setFilters} />
         </div>
 
         {/* Main Content */}
@@ -70,12 +115,44 @@ export default function MarketplacePage() {
           </div>
 
           {/* Products */}
-          {filteredProducts.length === 0 ? (
-            <p className="text-center text-muted-foreground">
-              No products found
-            </p>
-          ) : (
+          {isLoading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[...Array(6)].map((_, i) => (
+                <div key={i} className="bg-card rounded-3xl border border-border/40 overflow-hidden h-full flex flex-col p-4 space-y-4">
+                  <Skeleton className="aspect-square w-full rounded-2xl" />
+                  <div className="space-y-3">
+                    <Skeleton className="h-4 w-1/3" />
+                    <Skeleton className="h-7 w-3/4" />
+                    <Skeleton className="h-4 w-1/2" />
+                    <div className="flex items-center gap-2 pt-2">
+                      <Skeleton className="h-10 w-full rounded-xl" />
+                      <Skeleton className="h-10 w-12 rounded-xl" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : filteredProducts.length === 0 ? (
+            <Empty className="py-24 animate-in fade-in zoom-in-95 duration-500">
+               <EmptyMedia variant="icon" className="bg-slate-50 text-slate-300 ring-4 ring-slate-50/50">
+                  <ShoppingBag className="w-8 h-8" />
+               </EmptyMedia>
+               <EmptyHeader>
+                  <EmptyTitle className="text-2xl font-black text-slate-900 tracking-tight">No treasures found</EmptyTitle>
+                  <EmptyDescription className="text-slate-500 max-w-xs mx-auto font-medium">
+                    We couldn't find any products matching your current filters. Try adjusting your search or category selection.
+                  </EmptyDescription>
+               </EmptyHeader>
+               <Button 
+                variant="outline" 
+                onClick={() => setFilters({ categories: [], priceRange: [0, 1000], availability: [], rating: 0 })}
+                className="rounded-xl border-2 border-slate-200 hover:border-primary hover:text-primary font-bold px-8"
+              >
+                 Clear All Filters
+               </Button>
+            </Empty>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
               {filteredProducts.map((product) => (
                 <ProductCard key={product.id} product={product} onDeleteAction={() => {}} />
               ))}

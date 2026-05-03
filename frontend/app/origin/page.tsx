@@ -13,6 +13,7 @@ export default function OriginDetectionPage() {
   const router = useRouter()
   const [selectedImage, setSelectedImage] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string>('')
+  const [isDragging, setIsDragging] = useState(false)
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<OriginResult | null>(null)
 
@@ -34,12 +35,19 @@ export default function OriginDetectionPage() {
 
   const onDrop = (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault()
+    setIsDragging(false)
     const file = event.dataTransfer.files?.[0] ?? null
     handleFileChange(file)
   }
 
   const onDragOver = (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault()
+    setIsDragging(true)
+  }
+
+  const onDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    setIsDragging(false)
   }
 
   const analyzeCraft = async () => {
@@ -60,43 +68,51 @@ export default function OriginDetectionPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-10 md:px-8">
-      <div className="mx-auto w-full max-w-3xl space-y-8">
-        <section className="rounded-2xl border border-border bg-white p-6 shadow-sm">
-          <h1 className="text-3xl font-bold">Detect Craft Origin</h1>
-          <p className="mt-2 text-sm text-muted-foreground">Upload a craft image to identify its origin and technique</p>
+    <main className="min-h-screen bg-background px-4 py-10 md:px-8">
+      <div className="mx-auto w-full max-w-3xl space-y-8 fade-in-up">
+        <section className="surface-panel p-8">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h1 className="text-4xl font-black text-foreground">Detect Craft Origin</h1>
+              <p className="mt-2 text-base text-muted-foreground">Upload a craft image to identify its origin and technique</p>
+            </div>
+            <div className="inline-flex items-center gap-2 rounded-full border border-accent/50 bg-accent/10 px-4 py-2 text-sm font-semibold text-accent">
+              AI-powered insight for handmade goods
+            </div>
+          </div>
 
           <div
-            className="mt-6 rounded-xl border-dashed border border-border p-4 text-center transition hover:border-primary/70 hover:bg-slate-100"
+            className={`mt-6 upload-dropzone p-6 text-center ${isDragging ? 'upload-dropzone-active' : ''}`}
             onDrop={onDrop}
             onDragOver={onDragOver}
+            onDragLeave={onDragLeave}
           >
             <input
               type="file"
               accept="image/*"
               onChange={onInputChange}
-              className="w-full cursor-pointer rounded-lg border border-border p-3"
+              className="w-full cursor-pointer rounded-2xl border border-border bg-white p-4 shadow-sm"
             />
-            <p className="mt-2 text-sm text-muted-foreground">Or drag and drop a file here</p>
+            <p className="mt-3 text-sm text-muted-foreground">Or drag and drop a file here</p>
 
             {previewUrl ? (
               <img
                 src={previewUrl}
                 alt="Preview"
-                className="mt-4 mx-auto max-h-64 w-full rounded-lg object-contain"
+                className="mt-6 mx-auto max-h-64 w-full rounded-3xl object-contain shadow-inner preview-appear"
               />
             ) : (
-              <div className="mt-4 h-64 rounded-lg border border-dashed border-border bg-slate-100 flex items-center justify-center text-sm text-muted-foreground">
+              <div className="mt-6 h-64 rounded-3xl border border-dashed border-border bg-card/80 flex items-center justify-center px-6 text-sm text-muted-foreground">
                 Preview will appear here
               </div>
             )}
           </div>
 
-          <div className="mt-6 flex flex-col items-start gap-3">
+          <div className="mt-6 flex flex-col items-start gap-3 sm:flex-row sm:items-center">
             <button
               onClick={analyzeCraft}
               disabled={!selectedImage || loading}
-              className="rounded-xl bg-primary px-4 py-2 font-semibold text-white transition hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="btn btn-primary-modern rounded-3xl px-6 py-3 font-semibold text-white transition hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? (
                 <span className="inline-flex items-center gap-2">
@@ -110,34 +126,34 @@ export default function OriginDetectionPage() {
 
             <button
               onClick={() => router.push('/discover')}
-              className="rounded-xl border border-border px-4 py-2 text-sm font-medium hover:bg-slate-100"
+              className="btn-secondary-modern rounded-3xl px-5 py-3 text-sm font-semibold"
             >
               Find Similar Products
             </button>
           </div>
         </section>
 
-        <section className="rounded-2xl border border-border bg-white p-6 shadow-sm">
-          <h2 className="text-2xl font-bold">Origin Detection Result</h2>
+        <section className="surface-panel p-8">
+          <h2 className="text-3xl font-bold text-foreground">Origin Detection Result</h2>
 
           {!result && !loading ? (
-            <div className="mt-6 rounded-lg border border-dashed border-border p-8 text-center text-muted-foreground">
+            <div className="mt-6 rounded-3xl border border-dashed border-border p-8 text-center text-muted-foreground">
               {selectedImage ? 'Click analyze to detect craft origin' : 'Upload an image to start'}
             </div>
           ) : null}
 
           {result ? (
-            <div className="mt-6 rounded-xl border border-border bg-slate-50 p-5 shadow-sm">
-              <div className="mb-3 text-sm text-muted-foreground">Region</div>
-              <div className="mb-4 text-lg font-semibold">{result.region}</div>
+            <div className="mt-6 rounded-3xl border border-border bg-card/80 p-6 shadow-sm transition-transform duration-300 hover:-translate-y-1">
+              <div className="mb-3 text-sm uppercase tracking-[0.15em] text-muted-foreground">Region</div>
+              <div className="mb-4 text-2xl font-semibold text-foreground">{result.region}</div>
 
-              <div className="mb-3 text-sm text-muted-foreground">Craft Type</div>
-              <div className="mb-4 text-lg font-semibold">{result.craftType}</div>
+              <div className="mb-3 text-sm uppercase tracking-[0.15em] text-muted-foreground">Craft Type</div>
+              <div className="mb-4 text-2xl font-semibold text-foreground">{result.craftType}</div>
 
-              <div className="mb-3 text-sm text-muted-foreground">Confidence</div>
-              <div className="flex items-center gap-3">
-                <div className="text-lg font-semibold">{result.confidence}%</div>
-                <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-200">
+              <div className="mb-3 text-sm uppercase tracking-[0.15em] text-muted-foreground">Confidence</div>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <div className="text-2xl font-semibold text-foreground">{result.confidence}%</div>
+                <div className="h-3 flex-1 overflow-hidden rounded-full bg-muted">
                   <div className="h-full rounded-full bg-primary" style={{ width: `${result.confidence}%` }} />
                 </div>
               </div>

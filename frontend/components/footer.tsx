@@ -10,7 +10,7 @@ export default function Footer() {
         <div className="py-16 md:py-20 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8">
           {/* Brand Section */}
           <div className="flex flex-col gap-4">
-            <h3 className="text-2xl font-bold text-primary">Artisan</h3>
+            <h3 className="text-2xl font-bold text-primary">KalaSetu</h3>
             <p className="text-muted-foreground text-sm leading-relaxed">
               Connecting talented artisans with customers who appreciate handmade quality.
             </p>
@@ -109,7 +109,7 @@ export default function Footer() {
         {/* Bottom Footer */}
         <div className="border-t border-border py-8 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-muted-foreground text-sm">
-            © {currentYear} Artisan Marketplace. All rights reserved.
+            © {currentYear} KalaSetu. All rights reserved.
           </p>
           <div className="flex items-center gap-6">
             <a href="#" className="text-muted-foreground hover:text-primary transition-colors text-sm">

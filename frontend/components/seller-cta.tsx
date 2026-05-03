@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { ArrowRight } from 'lucide-react'
 
@@ -18,18 +19,22 @@ export default function SellerCta() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
             <Button
+              asChild
               size="lg"
               className="bg-white hover:bg-white/90 text-primary rounded-lg font-semibold group"
             >
-              Start Selling Your Craft
-              <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
+              <Link href="/register?role=artisan" className="inline-flex items-center gap-2">
+                Start Selling Your Craft
+                <ArrowRight className="w-4 h-4" />
+              </Link>
             </Button>
             <Button
+              asChild
               variant="outline"
               size="lg"
               className="border-white text-white hover:bg-white/10 rounded-lg font-semibold"
             >
-              Learn More
+              <Link href="/marketplace">Learn More</Link>
             </Button>
           </div>
         </div>

@@ -40,6 +40,7 @@ export default function FilterSidebar({ onFilterChange }: FilterSidebarProps) {
     availability: true,
     rating: true,
   });
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const toggleSection = (section: keyof typeof expandedSections) => {
     setExpandedSections((prev) => ({
@@ -82,45 +83,54 @@ export default function FilterSidebar({ onFilterChange }: FilterSidebarProps) {
   };
 
   return (
-    <aside className="w-64 bg-white border-r border-gray-200 overflow-y-auto">
-      <div className="p-6 space-y-6">
+    <>
+      {/* Mobile filter toggle */}
+      <div className="block lg:hidden mb-4">
+        <button
+          className="w-full px-4 py-2 rounded-lg bg-accent text-accent-foreground font-semibold shadow focus:outline-none focus:ring-2 focus:ring-primary"
+          onClick={() => setMobileOpen((v) => !v)}
+        >
+          {mobileOpen ? 'Hide Filters' : 'Show Filters'}
+        </button>
+      </div>
+      <aside className={`space-y-6 ${mobileOpen ? 'block' : 'hidden'} lg:block w-full lg:w-auto`}>
         {/* Categories */}
-        <div className="space-y-3">
+        <section>
           <button
+            className="flex items-center justify-between w-full font-semibold text-left text-base sm:text-lg mb-2"
             onClick={() => toggleSection('categories')}
-            className="flex items-center justify-between w-full font-semibold text-gray-900 hover:text-blue-600"
           >
-            <span>Categories</span>
-            {expandedSections.categories ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+            Categories
+            {expandedSections.categories ? <ChevronUp /> : <ChevronDown />}
           </button>
           {expandedSections.categories && (
             <div className="space-y-2 pl-2">
-              {CATEGORIES.map((category) => (
-                <label key={category} className="flex items-center gap-3 cursor-pointer">
+              {CATEGORIES.map((cat) => (
+                <label key={cat} className="flex items-center gap-2 text-sm">
                   <Checkbox
-                    checked={filters.categories.includes(category)}
-                    onCheckedChange={() => handleCategoryChange(category)}
+                    checked={filters.categories.includes(cat)}
+                    onCheckedChange={() => handleCategoryChange(cat)}
                   />
-                  <span className="text-sm text-gray-700">{category}</span>
+                  {cat}
                 </label>
               ))}
             </div>
           )}
-        </div>
+        </section>
 
         {/* Price Range */}
-        <div className="space-y-3">
+        <section>
           <button
+            className="flex items-center justify-between w-full font-semibold text-left text-base sm:text-lg mb-2"
             onClick={() => toggleSection('price')}
-            className="flex items-center justify-between w-full font-semibold text-gray-900 hover:text-blue-600"
           >
-            <span>Price Range</span>
-            {expandedSections.price ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+            Price Range
+            {expandedSections.price ? <ChevronUp /> : <ChevronDown />}
           </button>
           {expandedSections.price && (
             <div className="space-y-3 pl-2">
               <div>
-                <label className="text-xs text-gray-600">Min: ${filters.priceRange[0]}</label>
+                <label className="text-xs text-muted-foreground">Min: ${filters.priceRange[0]}</label>
                 <input
                   type="range"
                   min="0"
@@ -131,7 +141,7 @@ export default function FilterSidebar({ onFilterChange }: FilterSidebarProps) {
                 />
               </div>
               <div>
-                <label className="text-xs text-gray-600">Max: ${filters.priceRange[1]}</label>
+                <label className="text-xs text-muted-foreground">Max: ${filters.priceRange[1]}</label>
                 <input
                   type="range"
                   min="0"
@@ -143,56 +153,56 @@ export default function FilterSidebar({ onFilterChange }: FilterSidebarProps) {
               </div>
             </div>
           )}
-        </div>
+        </section>
 
         {/* Availability */}
-        <div className="space-y-3">
+        <section>
           <button
+            className="flex items-center justify-between w-full font-semibold text-left text-base sm:text-lg mb-2"
             onClick={() => toggleSection('availability')}
-            className="flex items-center justify-between w-full font-semibold text-gray-900 hover:text-blue-600"
           >
-            <span>Availability</span>
-            {expandedSections.availability ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+            Availability
+            {expandedSections.availability ? <ChevronUp /> : <ChevronDown />}
           </button>
           {expandedSections.availability && (
             <div className="space-y-2 pl-2">
               {['In Stock', 'Out of Stock'].map((status) => (
-                <label key={status} className="flex items-center gap-3 cursor-pointer">
+                <label key={status} className="flex items-center gap-2 text-sm">
                   <Checkbox
                     checked={filters.availability.includes(status)}
                     onCheckedChange={() => handleAvailabilityChange(status)}
                   />
-                  <span className="text-sm text-gray-700">{status}</span>
+                  {status}
                 </label>
               ))}
             </div>
           )}
-        </div>
+        </section>
 
         {/* Rating */}
-        <div className="space-y-3">
+        <section>
           <button
+            className="flex items-center justify-between w-full font-semibold text-left text-base sm:text-lg mb-2"
             onClick={() => toggleSection('rating')}
-            className="flex items-center justify-between w-full font-semibold text-gray-900 hover:text-blue-600"
           >
-            <span>Rating</span>
-            {expandedSections.rating ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+            Rating
+            {expandedSections.rating ? <ChevronUp /> : <ChevronDown />}
           </button>
           {expandedSections.rating && (
             <div className="space-y-2 pl-2">
               {RATINGS.map((rating, index) => (
-                <label key={rating} className="flex items-center gap-3 cursor-pointer">
+                <label key={rating} className="flex items-center gap-2 text-sm">
                   <Checkbox
                     checked={filters.rating === index + 1}
                     onCheckedChange={() => handleRatingChange(index + 1)}
                   />
-                  <span className="text-sm text-gray-700">{rating}</span>
+                  {rating}
                 </label>
               ))}
             </div>
           )}
-        </div>
-      </div>
-    </aside>
+        </section>
+      </aside>
+    </>
   );
 }

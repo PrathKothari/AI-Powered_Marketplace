@@ -53,7 +53,7 @@ export default function LoginPage() {
              <span className="text-xl font-bold text-primary">✨</span>
           </div>
           <h1 className="text-3xl font-bold text-foreground">Welcome Back</h1>
-          <p className="text-muted-foreground mt-2">Sign in to continue to CraftHub</p>
+          <p className="text-muted-foreground mt-2">Sign in to continue to KalaSetu</p>
         </div>
 
         {errorDesc && <p className="text-red-500 text-sm text-center">{errorDesc}</p>}

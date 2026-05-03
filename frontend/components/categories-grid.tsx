@@ -1,7 +1,7 @@
 'use client'
 
+import Link from 'next/link'
 import { Card } from '@/components/ui/card'
-import Image from 'next/image'
 
 const categories = [
   { id: 1, name: 'Jewelry', color: 'from-amber-100 to-orange-100' },
@@ -27,16 +27,19 @@ export default function CategoriesGrid() {
         {/* Categories Grid */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
           {categories.map((category) => (
-            <Card
+            <Link
               key={category.id}
-              className="group cursor-pointer overflow-hidden bg-card border-border hover:shadow-lg transition-all duration-300 h-48"
+              href={`/marketplace?category=${encodeURIComponent(category.name.toLowerCase())}`}
+              className="group overflow-hidden h-48"
             >
-              <div className={`h-full flex items-center justify-center ${category.color} group-hover:scale-105 transition-transform duration-300`} style={{ backgroundImage: 'linear-gradient(135deg, rgba(0,0,0,0.03), rgba(0,0,0,0))' }}>
-                <div className="text-center">
-                  <h3 className="text-xl md:text-2xl font-semibold text-foreground">{category.name}</h3>
+              <Card className="cursor-pointer overflow-hidden bg-card border-border hover:shadow-lg transition-all duration-300 h-full">
+                <div className={`h-full flex items-center justify-center ${category.color} group-hover:scale-105 transition-transform duration-300`} style={{ backgroundImage: 'linear-gradient(135deg, rgba(0,0,0,0.03), rgba(0,0,0,0))' }}>
+                  <div className="text-center">
+                    <h3 className="text-xl md:text-2xl font-semibold text-foreground">{category.name}</h3>
+                  </div>
                 </div>
-              </div>
-            </Card>
+              </Card>
+            </Link>
           ))}
         </div>
       </div>
