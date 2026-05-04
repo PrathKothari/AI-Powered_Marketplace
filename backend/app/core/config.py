@@ -27,6 +27,7 @@ class Settings(BaseSettings):
 
     # Video generation defaults
     STORY_SECONDS_PER_IMAGE: int = 4
+    STORY_MIN_TOTAL_DURATION: int = 30
     STORY_VIDEO_FPS: int = 30
     TEMP_DIR: str = "temp"
     GEMINI_MODEL_NAME: str = Field(default="gemini-1.5-flash", validation_alias=AliasChoices("GEMINI_MODEL_NAME", "VERTEX_MODEL"))
@@ -72,6 +73,13 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: Optional[str] = None
     HF_TOKEN: Optional[str] = None
 
+    # Text-to-Speech / Audio defaults
+    STORY_TTS_LANGUAGE: str = "en-US"
+    STORY_TTS_VOICE: str = "en-US-Wavenet-D"
+    STORY_TTS_SPEAKING_RATE: float = 1.0
+    STORY_TTS_PITCH: float = 0.0
+    STORY_MUSIC_VOLUME: float = 0.15
+
     model_config = SettingsConfigDict(
         case_sensitive=True,
         env_file=(".env.local", ".env"),
@@ -89,6 +97,12 @@ class Settings(BaseSettings):
     # Telegram
     TELEGRAM_BOT_TOKEN: str = ""
 
-    model_config = SettingsConfigDict(case_sensitive=True, env_file=".env", env_file_encoding='utf-8', extra='ignore')
+    # Load .env.local first (for local secrets), then .env as fallback
+    model_config = SettingsConfigDict(
+        case_sensitive=True,
+        env_file=(".env.local", ".env"),
+        env_file_encoding='utf-8',
+        extra='ignore',
+    )
 
 settings = Settings()

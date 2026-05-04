@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 
 from app.services.storytelling.ai_copy import generate_ad_copy
+from app.services.storytelling.ai_copy import generate_narration
 from app.services.storytelling.audio_engine import generate_audio_from_text
 from app.services.storytelling.storage_service import upload_file_to_gcs
 from app.services.storytelling.video_engine import render_video
@@ -30,17 +31,22 @@ def generate_story_video(
         style_preset=style_preset,
     )
 
-    # Step 2: Generate TTS audio — gracefully skip if Google TTS credentials are missing
+    # Step 2: Generate a fuller narration for the story and synthesize audio.
+    # Use the dedicated narration generator so the TTS audio is a proper story.
+    narration = None
+    try:
+        narration = generate_narration(description, product_name=product_name, tone=tone, style_preset=style_preset)
+    except Exception:
+        narration = None
+
     audio_path = None
     try:
-        script = ". ".join(
-            [
-                creative.get("hook", ""),
-                creative.get("main", ""),
-            ]
-            + (creative.get("scene_captions", []))
-            + [creative.get("cta", "")]
-        )
+        # Prefer the full narration for audio; fall back to a compact script if narration missing
+        script = narration or ". ".join([
+            creative.get("hook", ""),
+            creative.get("main", ""),
+        ] + (creative.get("scene_captions", [])) + [creative.get("cta", "")])
+
         audio_path = generate_audio_from_text(script)
     except Exception as e:
         logger.warning("TTS audio generation failed, rendering silent video: %s", e)
@@ -62,8 +68,9 @@ def generate_story_video(
         from pathlib import Path
         public_url = f"/media/videos/{Path(local_video).name}"
 
-    return {
+    result = {
         "video_url": public_url,
         "local_path": local_video,
-        "creative": creative,
     }
+
+    return result

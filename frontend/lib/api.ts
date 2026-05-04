@@ -380,13 +380,18 @@ export interface StoryCreative {
 export interface StoryVideoResponse {
     video_url: string
     local_path?: string
-    creative: StoryCreative
+    narration?: string
 }
 
 export interface GenerateStoryPayload {
     description: string
     image_urls: string[]
     product_name?: string
+    painting_name?: string
+    art_style?: string
+    price?: string
+    state_of_origin?: string
+    materials?: string
     tone?: string
     audience?: string
     style_preset?: string

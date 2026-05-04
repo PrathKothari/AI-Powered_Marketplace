@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
+import math
 import uuid
 import random
 from pathlib import Path
@@ -55,6 +56,28 @@ def _escape_ffmpeg_path(path: str) -> str:
         return path.replace("\\", "/").replace(":", "\\:")
     return path
 
+
+def _ffprobe_duration(path: str) -> float | None:
+    try:
+        result = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "default=noprint_wrappers=1:nokey=1",
+                path,
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return float(result.stdout.strip())
+    except Exception:
+        return None
+
 def _build_drawtext(text: str, *, y: int, start: float, end: float, size: int, color: str) -> str:
     # Bypass for font issue on Windows
     return ""
@@ -105,32 +128,46 @@ def _attach_audio(video_path: Path, audio_path: str | None) -> Path:
     if not audio_path or not Path(audio_path).exists():
         return video_path
 
+    video_duration = _ffprobe_duration(str(video_path))
     final_output = OUTPUT_DIR / f"{uuid.uuid4()}_final.mp4"
     command = [
         "ffmpeg",
         "-y",
         "-i",
         str(video_path),
+        "-stream_loop",
+        "-1",
         "-i",
         str(audio_path),
         "-map",
         "0:v:0",
         "-map",
         "1:a:0",
-        "-shortest",
         "-c:v",
         "copy",
         "-c:a",
         "aac",
-        str(final_output),
     ]
+
+    if video_duration:
+        command.extend(["-t", f"{video_duration:.2f}"])
+
+    command.append(str(final_output))
     subprocess.run(command, check=True)
     return final_output
+
+
+def _resolve_duration_per_image(image_count: int, requested_duration_per_image: int | None = None) -> int:
+    base_duration = max(int(requested_duration_per_image or settings.STORY_SECONDS_PER_IMAGE), 1)
+    minimum_per_image = max(math.ceil(int(settings.STORY_MIN_TOTAL_DURATION) / max(image_count, 1)), 1)
+    return max(base_duration, minimum_per_image)
 
 
 def render_video(image_paths: List[str], creative: Dict[str, Any], audio_path: str | None = None, duration_per_image: int | None = None) -> str:
     if not image_paths:
         raise ValueError("At least one product image is required")
+
+    duration_seconds = _resolve_duration_per_image(len(image_paths), duration_per_image)
 
     if len(image_paths) == 1:
         # If only one image, just do the basic clip filter and output
@@ -138,10 +175,9 @@ def render_video(image_paths: List[str], creative: Dict[str, Any], audio_path: s
             image_paths[0],
             creative,
             audio_path=audio_path,
-            duration_per_image=duration_per_image,
+            duration_per_image=duration_seconds,
         )
 
-    duration_seconds = max(int(duration_per_image or settings.STORY_SECONDS_PER_IMAGE), 1)
     fps = int(settings.STORY_VIDEO_FPS)
     transition_duration = 0.5  # seconds for each transition
 
@@ -212,7 +248,7 @@ def render_video(image_paths: List[str], creative: Dict[str, Any], audio_path: s
 
 
 def render_single_image_video(image_path: str, creative: Dict[str, Any], audio_path: str | None = None, duration_per_image: int | None = None) -> str:
-    duration_seconds = max(int(duration_per_image or settings.STORY_SECONDS_PER_IMAGE), 1)
+    duration_seconds = _resolve_duration_per_image(1, duration_per_image)
     fps = int(settings.STORY_VIDEO_FPS)
     source_path = str(Path(image_path).resolve())
     base_output = OUTPUT_DIR / f"{uuid.uuid4()}.mp4"

@@ -120,10 +120,26 @@ async def generate_video(
 async def generate_story_pipeline(payload: StoryVideoRequest):
     image_paths = [await _materialize_image_source(source) for source in payload.image_urls]
 
+    # Enrich the user-provided description with painting metadata so the AI can
+    # produce a more informed historical narration and reel copy.
+    parts = [payload.description or ""]
+    if getattr(payload, "painting_name", None):
+        parts.append(f"Painting: {payload.painting_name}")
+    if getattr(payload, "art_style", None):
+        parts.append(f"Art style: {payload.art_style}")
+    if getattr(payload, "price", None):
+        parts.append(f"Price: {payload.price}")
+    if getattr(payload, "state_of_origin", None):
+        parts.append(f"State of origin: {payload.state_of_origin}")
+    if getattr(payload, "materials", None):
+        parts.append(f"Materials: {payload.materials}")
+
+    enriched_description = "\n".join([p for p in parts if p])
+
     return await _generate_story_response(
         image_paths,
-        payload.description,
-        product_name=payload.product_name,
+        enriched_description,
+        product_name=payload.painting_name or payload.product_name,
         tone=payload.tone,
         audience=payload.audience,
         style_preset=payload.style_preset,

@@ -13,18 +13,24 @@ class StoryCreative(BaseModel):
     style_notes: str = Field(default="")
     visual_keywords: List[str] = Field(default_factory=list)
     scene_captions: List[str] = Field(default_factory=list)
+    narration: str | None = Field(default=None)
 
 
 class StoryVideoResponse(BaseModel):
     video_url: str
     local_path: Optional[str] = None
-    creative: StoryCreative
+    narration: Optional[str] = None
 
 
 class StoryVideoRequest(BaseModel):
     description: str
     image_urls: List[str]
     product_name: Optional[str] = None
+    painting_name: Optional[str] = None
+    art_style: Optional[str] = None
+    price: Optional[str] = None
+    state_of_origin: Optional[str] = None
+    materials: Optional[str] = None
     tone: str = "premium"
     audience: str = "online shoppers"
     style_preset: str = "museum_cinematic"

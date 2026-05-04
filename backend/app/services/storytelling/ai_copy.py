@@ -210,3 +210,51 @@ Rules:
         return _normalize_creative(parsed, description, image_count, style_preset)
     except Exception:
         return _fallback_copy(description, image_count, style_preset)
+
+
+def generate_narration(
+    description: str,
+    *,
+    product_name: str | None = None,
+    tone: str = "premium",
+    style_preset: str = "museum_cinematic",
+    max_sentences: int = 5,
+) -> str:
+    """Generate a short historical narration for a product/story.
+
+    The function attempts to use the configured model (Gemini/Vertex) and falls
+    back to a simple composed description if AI is unavailable.
+    """
+    model = _get_model()
+    # Product-first fallback when no model is available
+    if model is None:
+        base = f"{product_name + ' — ' if product_name else ''}{description or ''}"
+        fallback_cta = "Bring it home today." if product_name else "Available now."
+        short_benefit = "Handcrafted with care, offering rich texture and lasting presence."
+        return (base + " " + short_benefit + " " + fallback_cta)[:1000]
+
+    preset = STYLE_PRESETS.get(style_preset, STYLE_PRESETS["museum_cinematic"])
+    prompt = f"""
+You are a senior product storyteller and e-commerce copywriter. Produce a concise, product-focused audio narration (about {max_sentences} sentences) optimized for a 20-40 second social reel that highlights the product's key features, materials, craftsmanship, provenance, and the benefits of ownership. Use persuasive, benefit-led language while remaining natural and specific to the inputs. End with a short call-to-action or ownership cue (for example: "Bring it home", "Available now").
+
+Inputs:
+- product_name: {product_name or ''}
+- product_description: {description}
+- tone: {tone}
+- style_notes: {preset['description']}
+
+Rules:
+- Prioritize tangible features (materials, size, finish), then benefits (what owning it feels/means), then provenance (handmade, origin) if present.
+- Keep language concise, vivid, and actionable; avoid long historical exposition unless it supports product value.
+- Include one brief CTA at the end.
+- Return ONLY the narration text (no markdown, no JSON, no labels).
+""".strip()
+
+    try:
+        response = model.generate_content(prompt)
+        text = getattr(response, "text", "") or ""
+        return text.strip()
+    except Exception:
+        # Best-effort product copy on error
+        base = f"{product_name + ' — ' if product_name else ''}{description or ''}"
+        return (base + " \u2014 Handcrafted and available now.")[:1000]
