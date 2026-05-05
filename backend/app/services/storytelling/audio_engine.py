@@ -43,6 +43,41 @@ def _ffprobe_duration(path: str) -> float | None:
         return None
 
 
+def fit_audio_to_duration(audio_path: str, target_seconds: float) -> str | None:
+    """Trim or pad audio so it matches the requested duration.
+
+    This keeps the narration track aligned with the final video length without
+    re-rendering the visuals.
+    """
+    source = Path(audio_path)
+    if not source.exists():
+        return None
+
+    target_seconds = max(float(target_seconds), 0.1)
+    output_path = TEMP_DIR / f"{uuid.uuid4()}_fit.mp3"
+
+    cmd = [
+        "ffmpeg",
+        "-y",
+        "-i",
+        str(source.resolve()),
+        "-af",
+        "apad",
+        "-t",
+        f"{target_seconds:.2f}",
+        "-c:a",
+        "libmp3lame",
+        str(output_path.resolve()),
+    ]
+
+    try:
+        subprocess.run(cmd, check=True)
+        return str(output_path)
+    except Exception as e:
+        logger.warning("Audio duration fitting failed: %s", e)
+        return None
+
+
 def generate_audio_from_text(
     text: str,
     *,

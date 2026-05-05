@@ -9,6 +9,8 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from app.core.config import settings
+from .fal_client import generate_video_from_narration as _fal_generate_video
+from .kling_client import generate_video_from_narration as _kling_generate_video
 
 OUTPUT_DIR = Path(settings.STORY_OUTPUT_DIR)
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -286,3 +288,20 @@ def render_single_image_video(image_path: str, creative: Dict[str, Any], audio_p
     
     subprocess.run(ffmpeg_args, check=True)
     return str(_attach_audio(base_output, audio_path))
+
+
+def render_video_via_fal(narration: str, image_paths: List[str], voice: str | None = None) -> str:
+    """Generate a video using the external FAL API with narration and user images.
+
+    Returns a URL or local file path depending on the FAL response.
+    """
+    # Delegate to the FAL client which handles uploading images and receiving the video
+    return _fal_generate_video(narration=narration, image_paths=image_paths, voice=voice)
+
+
+def render_video_via_kling(narration: str, image_paths: List[str], voice: str | None = None) -> str:
+    """Generate a video using the external Kling API (if configured).
+
+    Returns a URL or local file path depending on Kling response.
+    """
+    return _kling_generate_video(narration=narration, image_paths=image_paths, voice=voice)

@@ -1,4 +1,5 @@
 from pathlib import Path
+import os
 from typing import List, Union
 from dotenv import load_dotenv
 from pydantic import AliasChoices, AnyHttpUrl, Field, field_validator
@@ -72,6 +73,14 @@ class Settings(BaseSettings):
     ML_MODEL_PATH: str = "./app/ml/models"
     GEMINI_API_KEY: Optional[str] = None
     HF_TOKEN: Optional[str] = None
+    # FAL (video generation) settings
+    FAL_API_KEY: Optional[str] = Field(default=None, validation_alias=AliasChoices("FAL_API_KEY", "FAL_KEY"))
+    FAL_API_URL: Optional[str] = Field(default="https://api.fal.ai", validation_alias=AliasChoices("FAL_API_URL", "FAL_URL"))
+
+    # Kling (alternative video generation provider)
+    KLING_ACCESS_KEY: Optional[str] = Field(default=None, validation_alias=AliasChoices("KLING_ACCESS_KEY", "KLING_KEY", "KLING_ACCESS"))
+    KLING_SECRET_KEY: Optional[str] = Field(default=None, validation_alias=AliasChoices("KLING_SECRET_KEY", "KLING_SECRET"))
+    KLING_API_URL: Optional[str] = Field(default="https://api-singapore.klingai.com", validation_alias=AliasChoices("KLING_API_URL", "KLING_URL"))
 
     # Text-to-Speech / Audio defaults
     STORY_TTS_LANGUAGE: str = "en-US"
@@ -106,3 +115,11 @@ class Settings(BaseSettings):
     )
 
 settings = Settings()
+
+# Prefer explicit FAL_KEY env var if provided (supports older setups that set FAL_KEY)
+# Pydantic already accepts the alias, but prefer the raw env var if present and
+# the parsed `FAL_API_KEY` is empty.
+if not settings.FAL_API_KEY:
+    _env_fal = os.getenv("FAL_KEY")
+    if _env_fal:
+        settings.FAL_API_KEY = _env_fal

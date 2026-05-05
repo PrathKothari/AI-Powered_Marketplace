@@ -52,5 +52,7 @@ temp_outputs/
 generated_media/
 scripts/smoke_test_storytelling.py
 scripts/run_generate_copy_test.py
+scripts/run_generate_story_test.py
+scripts/run_post_story_local.py
 temp/
 tests/

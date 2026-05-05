@@ -149,6 +149,35 @@ def _fallback_copy(description: str, image_count: int, style_preset: str) -> Dic
     )
 
 
+def _normalize_narration(text: str) -> str:
+    text = re.sub(r"\s+", " ", text or "").strip()
+    text = text.replace("—", "-")
+    return text
+
+
+def _fit_word_budget(text: str, target_words: int) -> str:
+    words = [word for word in _normalize_narration(text).split(" ") if word]
+    if target_words <= 0:
+        return ""
+    if len(words) == target_words:
+        return " ".join(words)
+    if len(words) > target_words:
+        return " ".join(words[:target_words])
+
+    filler = [
+        "It stands out for its refined finish.",
+        "Every detail feels intentional and premium.",
+        "It brings a calm sense of everyday luxury.",
+        "Designed to be noticed and appreciated.",
+    ]
+    output = words[:]
+    index = 0
+    while len(output) < target_words:
+        output.extend(filler[index % len(filler)].split())
+        index += 1
+    return " ".join(output[:target_words])
+
+
 def generate_ad_copy(
     description: str,
     *,
@@ -219,42 +248,114 @@ def generate_narration(
     tone: str = "premium",
     style_preset: str = "museum_cinematic",
     max_sentences: int = 5,
+    target_seconds: int = 30,
 ) -> str:
-    """Generate a short historical narration for a product/story.
+    """Generate a longer, non-repetitive narration for a product story (30 seconds).
 
-    The function attempts to use the configured model (Gemini/Vertex) and falls
-    back to a simple composed description if AI is unavailable.
+    The function attempts to use the configured model (Gemini/Vertex) with enhanced
+    prompting to avoid repetition, and falls back to a diverse set of pre-written
+    sentences if AI is unavailable.
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    
     model = _get_model()
-    # Product-first fallback when no model is available
-    if model is None:
-        base = f"{product_name + ' — ' if product_name else ''}{description or ''}"
-        fallback_cta = "Bring it home today." if product_name else "Available now."
-        short_benefit = "Handcrafted with care, offering rich texture and lasting presence."
-        return (base + " " + short_benefit + " " + fallback_cta)[:1000]
-
     preset = STYLE_PRESETS.get(style_preset, STYLE_PRESETS["museum_cinematic"])
-    prompt = f"""
-You are a senior product storyteller and e-commerce copywriter. Produce a concise, product-focused audio narration (about {max_sentences} sentences) optimized for a 20-40 second social reel that highlights the product's key features, materials, craftsmanship, provenance, and the benefits of ownership. Use persuasive, benefit-led language while remaining natural and specific to the inputs. End with a short call-to-action or ownership cue (for example: "Bring it home", "Available now").
+    target_words = int(target_seconds * 2.5)
+    target_words = max(target_words, 1)
+    
+    # Enhanced AI prompt for better narration generation
+    if model is not None:
+        prompt = f"""
+You are a professional product storyteller creating narration for a 30-second social media video.
 
-Inputs:
-- product_name: {product_name or ''}
-- product_description: {description}
-- tone: {tone}
-- style_notes: {preset['description']}
+CRITICAL REQUIREMENTS:
+- Generate {max_sentences} to {max_sentences + 2} complete sentences (NOT fewer)
+- Target approximately {target_seconds} seconds of spoken content (~{target_words} words)
+- Each sentence must introduce NEW information - ABSOLUTELY NO REPETITION
+- Avoid repeating the product name (use "it" instead)
+- Include a brief call-to-action at the end
 
-Rules:
-- Prioritize tangible features (materials, size, finish), then benefits (what owning it feels/means), then provenance (handmade, origin) if present.
-- Keep language concise, vivid, and actionable; avoid long historical exposition unless it supports product value.
-- Include one brief CTA at the end.
-- Return ONLY the narration text (no markdown, no JSON, no labels).
+PRODUCT DETAILS:
+- Name: {product_name or "(unnamed product)"}
+- Description: {description}
+- Tone: {tone}
+- Style: {preset['description']}
+
+REQUIRED STRUCTURE:
+1. Opening hook - Capture attention with a key benefit
+2. Material or Origin - Describe craftsmanship or provenance
+3. Design or Quality - Discuss distinctive features
+4. Use or Experience - How it improves daily life
+5. Emotion or Value - What it means to own
+6. Final appeal - Call to action (Shop Now, Bring it Home, etc.)
+
+STRICT RULES:
+- NEVER repeat phrases or keywords (no "handcrafted handcrafted" or "premium premium")
+- Each sentence must add completely new information
+- Use varied, vivid language and active verbs
+- Be specific about materials, techniques, or design elements
+- Avoid vague adjectives unless truly necessary
+- Return ONLY plain text narration (no markdown, no JSON, no explanations, no metadata)
+- Minimum {target_words} words for proper duration
 """.strip()
 
-    try:
-        response = model.generate_content(prompt)
-        text = getattr(response, "text", "") or ""
-        return text.strip()
-    except Exception:
-        # Best-effort product copy on error
-        base = f"{product_name + ' — ' if product_name else ''}{description or ''}"
-        return (base + " \u2014 Handcrafted and available now.")[:1000]
+        try:
+            response = model.generate_content(prompt)
+            text = getattr(response, "text", "") or ""
+            text = _normalize_narration(text)
+            if text:
+                # Validate length
+                words = len(text.split())
+                logger.info(f"AI narration generated: {words} words (~{words/2.5:.1f}s)")
+                if words >= int(target_words * 0.7):  # Accept if 70%+ of target
+                    return _fit_word_budget(text, target_words)
+                else:
+                    logger.warning(f"AI narration too short ({words} words < {int(target_words * 0.7)}), using fallback")
+        except Exception as e:
+            logger.warning(f"AI narration generation failed: {e}, using fallback")
+
+    # Enhanced fallback narration - diverse sentences with no repetition
+    logger.info("Using fallback narration generation")
+    fallback_sentences = [
+        f"Introducing {product_name or 'a carefully crafted product'}, where premium quality meets thoughtful design.",
+        f"Crafted from {description if len(description.split()) <= 5 else 'premium materials'}, this piece embodies both elegance and durability.",
+        "Every detail has been meticulously considered, from the selection of materials to the final finishing touches.",
+        "The result is an object that feels as good as it looks, bringing a sense of refinement to everyday moments.",
+        "Whether you're seeking a statement piece or a versatile addition to your collection, this delivers on both counts.",
+        "Designed to stand the test of time, it's an investment in quality that pays dividends through years of use.",
+        "The thoughtful proportions and refined aesthetic make it equally at home in contemporary or classic settings.",
+        "Experience the difference when form and function unite in perfect harmony.",
+        "This is more than a purchase—it's a commitment to owning something truly special.",
+        "Perfect for those who understand that true luxury isn't loud; it's understated and enduring.",
+        "Make it yours today and discover why discerning collectors choose pieces like this.",
+        "Available now for those ready to elevate their standards.",
+    ]
+    
+    # Build narration with sufficient length, avoiding repetition
+    narration_parts = []
+    words_so_far = 0
+    
+    for sentence in fallback_sentences:
+        if words_so_far >= target_words:
+            break
+        narration_parts.append(sentence)
+        words_so_far += len(sentence.split())
+    
+    narration = " ".join(narration_parts)
+    
+    # Ensure we have enough content (at least 70% of target)
+    min_words = int(target_words * 0.7)
+    if len(narration.split()) < min_words:
+        extra_sentences = [
+            "It's the kind of piece that becomes a favorite, noticed and appreciated by everyone who sees it.",
+            "Designed for people who value substance and authenticity over trends.",
+            "An excellent gift for someone special or a well-deserved treat for yourself.",
+        ]
+        for extra_sent in extra_sentences:
+            if len(narration.split()) < min_words:
+                narration += " " + extra_sent
+    
+    final_word_count = len(narration.split())
+    logger.info(f"Fallback narration generated: {final_word_count} words (~{final_word_count/2.5:.1f}s)")
+    return _fit_word_budget(narration, target_words)
