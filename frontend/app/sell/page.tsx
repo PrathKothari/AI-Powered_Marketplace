@@ -188,9 +188,12 @@ function SellPage() {
         description: formData.description,
         image_urls: imageUrls,
         product_name: formData.title,
-        tone: 'premium',
+        price: formData.price,
+        product_type: formData.craftType === 'Other' ? customCraftType.trim() : formData.craftType,
+        location: formData.region,
+        tone: 'warm',
         audience: 'online shoppers',
-        style_preset: 'museum_cinematic',
+        style_preset: 'artisan_story',
         duration_per_image: 4,
       })
 

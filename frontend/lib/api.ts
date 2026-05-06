@@ -387,9 +387,14 @@ export interface GenerateStoryPayload {
     description: string
     image_urls: string[]
     product_name?: string
+    price?: string
+    product_type?: string
+    artisan_name?: string
+    location?: string
+    brand_name?: string
+    generated_narration_audio_path?: string
     painting_name?: string
     art_style?: string
-    price?: string
     state_of_origin?: string
     materials?: string
     tone?: string

@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import AliasChoices, BaseModel, Field, field_validator
 
 
 class StoryCreative(BaseModel):
@@ -20,15 +20,22 @@ class StoryVideoResponse(BaseModel):
     video_url: str
     local_path: Optional[str] = None
     narration: Optional[str] = None
+    storyboard: Optional[dict] = None
+    storyboard_path: Optional[str] = None
 
 
 class StoryVideoRequest(BaseModel):
     description: str
-    image_urls: List[str]
-    product_name: Optional[str] = None
+    image_urls: List[str] = Field(validation_alias=AliasChoices("image_urls", "productImages"))
+    product_name: Optional[str] = Field(default=None, validation_alias=AliasChoices("product_name", "productName"))
+    price: Optional[str] = None
+    product_type: Optional[str] = Field(default=None, validation_alias=AliasChoices("product_type", "productType"))
+    artisan_name: Optional[str] = Field(default=None, validation_alias=AliasChoices("artisan_name", "artisanName"))
+    location: Optional[str] = None
+    brand_name: Optional[str] = Field(default=None, validation_alias=AliasChoices("brand_name", "brandName"))
+    generated_narration_audio_path: Optional[str] = Field(default=None, validation_alias=AliasChoices("generated_narration_audio_path", "generatedNarrationAudioPath"))
     painting_name: Optional[str] = None
     art_style: Optional[str] = None
-    price: Optional[str] = None
     state_of_origin: Optional[str] = None
     materials: Optional[str] = None
     tone: str = "premium"

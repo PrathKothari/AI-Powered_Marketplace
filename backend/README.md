@@ -63,4 +63,40 @@ This is the FastAPI backend for the AI-Powered Artisan Marketplace. It is design
 
 - If Google Cloud Storage credentials are configured, the rendered video is uploaded there.
 - Otherwise, the backend stores the file locally and serves it from /media/videos/...
-- The AI copy prompt is tuned for painting-inspired, cinematic product promos.
+- The story video pipeline runs locally with FFmpeg. Gemini is used only for storyboard/script JSON when `GEMINI_API_KEY` is set. If Gemini is unavailable, OpenAI is tried when `OPENAI_API_KEY` and the `openai` package are available. If neither key works, a local 5-scene storyboard template is used.
+- The renderer uses uploaded product images, scene-by-scene camera effects, fade transitions, readable text overlays, optional narration audio, and optional low-volume background music.
+
+## Local story video generation
+
+Required local tools:
+
+```bash
+ffmpeg -version
+ffprobe -version
+```
+
+Optional environment variables:
+
+```bash
+GEMINI_API_KEY="..."
+OPENAI_API_KEY="..."
+STORY_FONT_PATH="C:/Windows/Fonts/arial.ttf"
+STORYBOARD_BACKGROUND_MUSIC_PATH="assets/music.mp3"
+STORYBOARD_BACKGROUND_MUSIC_VOLUME=0.12
+```
+
+Run the backend API:
+
+```bash
+cd backend
+uvicorn app.main:app --reload --port 8001
+```
+
+Run the local example without the frontend:
+
+```bash
+cd backend
+python examples/generate_story_video_local.py --image ./sample-product.jpg --name "Handmade Ceramic Mug" --price "Rs. 899" --type "Ceramic craft"
+```
+
+Generated storyboard JSON is saved under `generated-videos/storyboards/.../storyboard.json`. Final MP4 files are saved under `generated-videos/` and copied to `/media/videos/...` when cloud storage is not configured.

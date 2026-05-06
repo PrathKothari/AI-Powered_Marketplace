@@ -25,6 +25,15 @@ class Settings(BaseSettings):
     STORY_MEDIA_DIR: str = "generated_media"
     STORY_DEFAULT_MUSIC: str = "assets/music.mp3"
     STORY_FONT_PATH: str = ""
+    STORYBOARD_OUTPUT_DIR: str = "generated-videos"
+    STORYBOARD_TEMP_DIR: str = "tmp/video-scenes"
+    STORYBOARD_VIDEO_WIDTH: int = 1080
+    STORYBOARD_VIDEO_HEIGHT: int = 1920
+    STORYBOARD_DEFAULT_DURATION_SECONDS: int = 30
+    STORYBOARD_ASPECT_RATIO: str = "9:16"
+    STORYBOARD_BACKGROUND_MUSIC_PATH: str = ""
+    STORYBOARD_BACKGROUND_MUSIC_VOLUME: float = 0.12
+    STORYBOARD_KEEP_TEMP: bool = False
 
     # Video generation defaults
     STORY_SECONDS_PER_IMAGE: int = 4
@@ -72,6 +81,8 @@ class Settings(BaseSettings):
     # AI/ML
     ML_MODEL_PATH: str = "./app/ml/models"
     GEMINI_API_KEY: Optional[str] = None
+    OPENAI_API_KEY: Optional[str] = None
+    OPENAI_MODEL_NAME: str = "gpt-4o-mini"
     HF_TOKEN: Optional[str] = None
     # FAL (video generation) settings
     FAL_API_KEY: Optional[str] = Field(default=None, validation_alias=AliasChoices("FAL_API_KEY", "FAL_KEY"))
