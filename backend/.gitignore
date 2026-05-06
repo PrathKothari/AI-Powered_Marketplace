@@ -1,0 +1,58 @@
+.venv/
+.env.local
+__pycache__/
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# Virtual environment
+venv/
+.venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Node (accidental installs)
+node_modules/
+yarn.lock
+package-lock.json
+pnpm-lock.yaml
+
+# env files
+.env
+.env.*
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# pytest / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+service-account.json
+temp_uploads/
+temp_outputs/
+generated_media/
+scripts/smoke_test_storytelling.py
+scripts/run_generate_copy_test.py
+scripts/run_generate_story_test.py
+scripts/run_post_story_local.py
+temp/
+tests/
