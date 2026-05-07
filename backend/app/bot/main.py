@@ -9,17 +9,34 @@ import asyncio
 import logging
 import threading
 
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters
-
-from app.core.config import settings
-from app.bot.handlers import (
-    start_command,
-    help_command,
-    handle_text_message,
-    handle_image_message,
+from telegram.error import InvalidToken
+from telegram.ext import (
+    ApplicationBuilder,
+    CallbackQueryHandler,
+    CommandHandler,
+    MessageHandler,
+    filters,
 )
 
+from app.bot.auth.conversation import build_auth_conversation_handler, handle_keep_logged_in
+from app.bot.auth.persistence import FirestoreConversationPersistence
+from app.bot.cart.handlers import handle_cart_callback
+from app.bot.catalog.handlers import handle_catalog_callback, show_recommendations
+from app.bot.handlers import (
+    handle_image_message,
+    handle_text_message,
+    help_command,
+    start_command,
+)
+from app.bot.live.handlers import handle_live_callback, post_live_chat
+from app.bot.notifications.dispatcher import register_notification_jobs
+from app.bot.orders.handlers import build_checkout_conversation_handler, handle_order_callbacks
+from app.bot.payments.handlers import handle_pay_callback
+from app.bot.sell.conversation import build_sell_conversation_handler
+from app.core.config import settings
+
 logger = logging.getLogger(__name__)
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 _bot_thread: threading.Thread | None = None
 
@@ -27,12 +44,76 @@ _bot_thread: threading.Thread | None = None
 def _build_app():
     """Build the telegram Application with all handlers registered."""
     token = settings.TELEGRAM_BOT_TOKEN
-    app = ApplicationBuilder().token(token).build()
+    app = (
+        ApplicationBuilder()
+        .token(token)
+        .persistence(FirestoreConversationPersistence())
+        .build()
+    )
 
-    app.add_handler(CommandHandler("start", start_command))
-    app.add_handler(CommandHandler("help", help_command))
-    app.add_handler(MessageHandler(filters.PHOTO, handle_image_message))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_message))
+    conversation_timeout = 600 if getattr(app, "_job_queue", None) is not None else None
+
+    # ── Group 0: Auth ConversationHandler (highest priority) ──────────────
+    app.add_handler(build_auth_conversation_handler(conversation_timeout=conversation_timeout), group=0)
+
+    # ── Group 1: Feature ConversationHandlers ────────────────────────────
+    app.add_handler(build_sell_conversation_handler(), group=1)
+    app.add_handler(build_checkout_conversation_handler(), group=1)
+
+    # ── Group 2: Commands & keep-logged-in callback ───────────────────────
+    app.add_handler(CommandHandler("start", start_command), group=2)
+    app.add_handler(CommandHandler("help", help_command), group=2)
+    app.add_handler(CallbackQueryHandler(handle_keep_logged_in, pattern=r"^auth_keep:(yes|no)$"), group=2)
+
+    # ── Group 3: Catalog callbacks (cat:, prod:, artisan:) ────────────────
+    app.add_handler(
+        CallbackQueryHandler(handle_catalog_callback, pattern=r"^(cat:|prod:|artisan:)"),
+        group=3,
+    )
+
+    # ── Group 4: Cart callbacks (cart_add:, cart_remove:, cart_clear, cart_detail:) ──
+    app.add_handler(
+        CallbackQueryHandler(
+            handle_cart_callback,
+            pattern=r"^(cart_add:|cart_remove:|cart_clear|cart_detail:)",
+        ),
+        group=4,
+    )
+
+    # ── Group 5: Order & checkout callbacks ──────────────────────────────
+    app.add_handler(
+        CallbackQueryHandler(
+            handle_order_callbacks,
+            pattern=r"^(order_list:|order_detail:|order_ship:|order_confirm:)",
+        ),
+        group=5,
+    )
+
+    # ── Group 6: Payment callbacks ────────────────────────────────────────
+    app.add_handler(CallbackQueryHandler(handle_pay_callback, pattern=r"^pay:"), group=6)
+
+    # ── Group 7: Live stream callbacks ────────────────────────────────────
+    app.add_handler(
+        CallbackQueryHandler(handle_live_callback, pattern=r"^live:"),
+        group=7,
+    )
+
+    # ── Group 8: Recommendations shortcut ────────────────────────────────
+    app.add_handler(CommandHandler("recommendations", show_recommendations), group=8)
+
+    # ── Group 9: Image & text message handlers ────────────────────────────
+    # Live chat intercept: if user is in a live:chat session, post to Firestore
+    app.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, post_live_chat),
+        group=9,
+    )
+    app.add_handler(MessageHandler(filters.PHOTO, handle_image_message), group=9)
+    # General text (menu taps + AI chat/search) — lower priority than live chat
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_message), group=10)
+
+    # ── Notification jobs ─────────────────────────────────────────────────
+    if app.job_queue is not None:
+        register_notification_jobs(app.job_queue)
 
     return app
 
@@ -47,7 +128,6 @@ async def _run_bot_async():
 
     logger.info("🤖 KalaSetu Telegram Bot started — https://t.me/KalaSetu_bot")
 
-    # Keep running until the thread is interrupted
     try:
         while True:
             await asyncio.sleep(1)
@@ -102,7 +182,13 @@ if __name__ == "__main__":
 
     init_firebase()
 
-    # Standalone mode — use run_polling in main thread (signal handlers work here)
     app = _build_app()
     logger.info("🤖 KalaSetu Bot is starting... (Press Ctrl+C to stop)")
-    app.run_polling(drop_pending_updates=True)
+    try:
+        app.run_polling(drop_pending_updates=True)
+    except InvalidToken:
+        logger.error(
+            "Telegram bot token is invalid. Generate a new token in BotFather, "
+            "update TELEGRAM_BOT_TOKEN in backend/.env, then restart the bot."
+        )
+        sys.exit(1)

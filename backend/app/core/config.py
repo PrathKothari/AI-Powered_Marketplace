@@ -88,6 +88,10 @@ class Settings(BaseSettings):
 
     # Telegram
     TELEGRAM_BOT_TOKEN: str = ""
+    FRONTEND_URL: str = "http://localhost:3001"
+
+    TELEGRAM_IDLE_TIMEOUT_SECONDS: int = 3600      # 1 hour
+    TELEGRAM_KEEP_LOGGED_IN_SECONDS: int = 604800  # 7 days
 
     model_config = SettingsConfigDict(case_sensitive=True, env_file=".env", env_file_encoding='utf-8', extra='ignore')
 
