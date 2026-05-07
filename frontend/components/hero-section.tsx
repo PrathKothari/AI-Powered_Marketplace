@@ -5,6 +5,9 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { ArrowRight, ShoppingBag, Sparkles, Star } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { ArrowRight } from 'lucide-react'
+import Image from 'next/image'
+import Link from 'next/link'
 
 export default function HeroSection() {
   const [isMounted, setIsMounted] = useState(false)
@@ -58,6 +61,15 @@ export default function HeroSection() {
                 </Link>
               </Button>
               
+              <Link href="/marketplace">
+                <Button
+                  size="lg"
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg font-outfit font-bold uppercase tracking-wider group text-sm transition-all hover:scale-105 active:scale-95"
+                >
+                  Explore Products
+                  <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
+                </Button>
+              </Link>
               <Button
                 asChild
                 variant="outline"
@@ -65,6 +77,9 @@ export default function HeroSection() {
                 className="h-14 px-8 rounded-2xl border-2 border-slate-200 hover:border-primary hover:text-primary transition-all duration-300 font-bold"
               >
                 <Link href="/register?role=artisan">Join as Artisan</Link>
+                className="border-primary text-primary hover:bg-primary hover:text-white rounded-lg font-outfit font-bold uppercase tracking-wider text-sm transition-all hover:scale-105 active:scale-95"
+              >
+                Share Your Art
               </Button>
             </div>
 
@@ -120,6 +135,15 @@ export default function HeroSection() {
                <span className="text-lg font-black text-slate-900">100%</span>
                <span className="text-[10px] font-bold text-slate-400 uppercase leading-none">Organic</span>
             </div>
+          {/* Right Image */}
+          <div className="relative h-96 md:h-full min-h-96">
+            <Image
+              src="https://firebasestorage.googleapis.com/v0/b/ai-market-asst-1.firebasestorage.app/o/dataset%2Fmadhubani%2Fmadhubani0.jpg?alt=media&token=770c03a1-9df2-43a8-a9c7-addb89ca132a"
+              alt="Hand-painted Madhubani Masterpiece"
+              fill
+              className="object-cover rounded-xl shadow-2xl"
+              priority
+            />
           </div>
 
         </div>

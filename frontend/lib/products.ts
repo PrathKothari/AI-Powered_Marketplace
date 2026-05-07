@@ -1,13 +1,16 @@
 import { Product } from '@/lib/types/product'
 import { PRODUCTS } from '@/lib/mock-data/products'
 
+const PRODUCTS_VERSION = 'v2'
+
 export function getProducts(): Product[] {
   if (typeof window === 'undefined') return []
   try {
+    const version = localStorage.getItem('products_version')
     const data = localStorage.getItem('products')
-    if (!data) {
-      // Auto seed if empty
+    if (!data || version !== PRODUCTS_VERSION) {
       localStorage.setItem('products', JSON.stringify(PRODUCTS))
+      localStorage.setItem('products_version', PRODUCTS_VERSION)
       return PRODUCTS
     }
     return JSON.parse(data)

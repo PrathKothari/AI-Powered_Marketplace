@@ -1,7 +1,5 @@
 'use client'
-
-import { useEffect, useState } from 'react'
-import Link from 'next/link'
+import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Trash2, ShoppingBag, ArrowLeft, Plus, Minus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -9,7 +7,7 @@ import { Card } from '@/components/ui/card'
 import { getCart, clearCart, CartItem } from '@/lib/cart'
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 
-export default function CartPage() {
+export default function CartRedirect() {
   const router = useRouter()
   const [cart, setCart] = useState<CartItem[]>([])
 
@@ -234,4 +232,6 @@ export default function CartPage() {
       </div>
     </main>
   )
+  useEffect(() => { router.replace('/buyer/cart') }, [router])
+  return null
 }

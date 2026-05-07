@@ -9,6 +9,26 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { addOrder } from "@/lib/orders"
 import { toast } from "sonner"
+import { toast } from "sonner"
+import { createPaymentOrder, verifyPayment } from "@/lib/api"
+
+declare global {
+  interface Window {
+    Razorpay: any
+  }
+}
+
+function loadRazorpayScript(): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (document.getElementById('razorpay-script')) { resolve(true); return }
+    const script = document.createElement('script')
+    script.id = 'razorpay-script'
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js'
+    script.onload = () => resolve(true)
+    script.onerror = () => resolve(false)
+    document.body.appendChild(script)
+  })
+}
 
 export default function BuyerCartPage() {
   const { cartItems, totalItems, totalPrice, removeFromCart, updateQuantity, clearCart } = useCart()
@@ -25,7 +45,6 @@ export default function BuyerCartPage() {
 
   const handleCheckout = async () => {
     if (cartItems.length === 0) return
-
     setIsProcessing(true)
     // Simulate payment processing
     await new Promise((resolve) => setTimeout(resolve, 2000))
@@ -51,6 +70,72 @@ export default function BuyerCartPage() {
         description: "Please check your connection and try again.",
       })
     } finally {
+    try {
+      const loaded = await loadRazorpayScript()
+      if (!loaded) {
+        toast.error('Failed to load payment gateway. Please try again.')
+        setIsProcessing(false)
+        return
+      }
+
+      const orderItems = cartItems.map(item => ({
+        id: String(item.id),
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+        image: item.image ?? '',
+      }))
+
+      const paymentOrder = await createPaymentOrder(totalPrice, orderItems)
+
+      const options = {
+        key: paymentOrder.key_id,
+        amount: paymentOrder.amount,
+        currency: paymentOrder.currency,
+        name: 'KalaSetu',
+        description: 'Authentic Indian Art & Craft',
+        order_id: paymentOrder.razorpay_order_id,
+        handler: async (response: {
+          razorpay_payment_id: string
+          razorpay_order_id: string
+          razorpay_signature: string
+        }) => {
+          try {
+            const result = await verifyPayment({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              items: orderItems,
+              total: totalPrice,
+            })
+            if (result.success) {
+              clearCart()
+              toast.success(`Order ${result.orderId} placed successfully!`)
+              router.push('/orders')
+            }
+          } catch (err: any) {
+            toast.error(err.message || 'Payment verification failed.')
+          } finally {
+            setIsProcessing(false)
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            setIsProcessing(false)
+          },
+        },
+        prefill: {},
+        theme: { color: '#7c3aed' },
+      }
+
+      const rzp = new window.Razorpay(options)
+      rzp.on('payment.failed', (response: any) => {
+        toast.error(`Payment failed: ${response.error.description}`)
+        setIsProcessing(false)
+      })
+      rzp.open()
+    } catch (error: any) {
+      toast.error(error.message || 'Checkout failed. Please try again.')
       setIsProcessing(false)
     }
   }
@@ -145,6 +230,27 @@ export default function BuyerCartPage() {
                         className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                       />
                       <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+          <div className="lg:col-span-8 space-y-4">
+            {cartItems.map((item) => (
+              <Card 
+                key={item.id} 
+                className="overflow-hidden border-slate-200/60 bg-white shadow-sm hover:shadow-md transition-shadow group rounded-2xl p-4"
+              >
+                <div className="flex flex-col sm:flex-row items-center gap-6">
+                  {/* Item Image */}
+                  <div className="w-full sm:w-32 h-32 bg-slate-100 rounded-xl overflow-hidden flex-shrink-0 border border-slate-100 group-hover:scale-[1.02] transition-transform">
+                    <img 
+                      src={item.image || "/placeholder.png"} 
+                      alt={item.name} 
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+
+                  {/* Item Details */}
+                  <div className="flex-1 min-w-0 w-full">
+                    <div className="flex justify-between items-start mb-2">
+                       <h3 className="text-xl font-bold text-slate-800 truncate pr-4">{item.name}</h3>
+                       <p className="text-xl font-black text-primary">₹{item.price.toFixed(2)}</p>
                     </div>
 
                     {/* Item Details */}
@@ -190,6 +296,12 @@ export default function BuyerCartPage() {
                           <span className="w-12 text-center text-lg font-bold tabular-nums">
                             {item.quantity}
                           </span>
+                       </div>
+
+                       <div className="flex items-center gap-6">
+                          <p className="text-sm font-medium text-slate-400">
+                            Subtotal: <span className="text-slate-800 font-bold ml-1">₹{(item.price * item.quantity).toFixed(2)}</span>
+                          </p>
                           <button 
                             onClick={() => onUpdateQty(item.id, item.quantity + 1)}
                             className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-background hover:text-primary transition-all active:scale-90"
@@ -244,6 +356,33 @@ export default function BuyerCartPage() {
                     <span>Estimated Tax</span>
                     <span className="text-foreground tracking-tight">$0.00</span>
                   </div>
+          {/* Checkout Summary Panel */}
+          <aside className="lg:col-span-4">
+             <Card className="sticky top-24 p-8 border-slate-200 bg-white shadow-xl shadow-slate-200/50 rounded-3xl overflow-hidden">
+                {/* Decorative background element */}
+                <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 -mr-16 -mt-16 rounded-full blur-3xl pointer-events-none" />
+                
+                <h2 className="text-2xl font-bold text-slate-800 mb-8 flex items-center">
+                  Order Summary
+                </h2>
+
+                <div className="space-y-4 mb-8">
+                   <div className="flex justify-between text-slate-500 font-medium">
+                      <span>Subtotal</span>
+                      <span className="text-slate-800 font-bold">₹{totalPrice.toFixed(2)}</span>
+                   </div>
+                   <div className="flex justify-between text-slate-500 font-medium">
+                      <span>Estimated Shipping</span>
+                      <span className="text-emerald-500 font-bold">Free</span>
+                   </div>
+                   <div className="flex justify-between text-slate-500 font-medium pb-4">
+                      <span>Taxes & Fees</span>
+                      <span className="text-slate-800 font-bold">₹0.00</span>
+                   </div>
+                   <div className="pt-6 border-t border-slate-100 flex justify-between items-center">
+                      <span className="text-xl font-extrabold text-slate-800 uppercase tracking-wider">Total</span>
+                      <span className="text-3xl font-black text-primary">₹{totalPrice.toFixed(2)}</span>
+                   </div>
                 </div>
 
                 <div className="pt-6 border-t border-border/80 border-dashed">

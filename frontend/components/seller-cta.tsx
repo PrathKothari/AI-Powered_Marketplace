@@ -21,7 +21,7 @@ export default function SellerCta() {
             <Button
               asChild
               size="lg"
-              className="bg-white hover:bg-white/90 text-primary rounded-lg font-semibold group"
+              className="bg-white hover:bg-white/95 text-primary rounded-lg font-outfit font-bold uppercase tracking-wider text-sm transition-all hover:scale-105 active:scale-95 shadow-xl group border-none px-8"
             >
               <Link href="/register?role=artisan" className="inline-flex items-center gap-2">
                 Start Selling Your Craft
@@ -32,7 +32,7 @@ export default function SellerCta() {
               asChild
               variant="outline"
               size="lg"
-              className="border-white text-white hover:bg-white/10 rounded-lg font-semibold"
+              className="bg-white hover:bg-white/95 text-primary rounded-lg font-outfit font-bold uppercase tracking-wider text-sm transition-all hover:scale-105 active:scale-95 shadow-xl border-none px-8"
             >
               <Link href="/marketplace">Learn More</Link>
             </Button>

@@ -20,6 +20,14 @@ const NAV_LINKS = [
   { href: '/discover', label: 'Discover' },
   { href: '/origin', label: 'Origin' },
 ]
+import { ShoppingCart, User, Menu, Paintbrush, LogOut, ChevronDown, LayoutDashboard, Plus, Package, UserCircle, Radio } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { useCart } from '@/context/CartContext'
+import { useTranslation } from '@/lib/i18n'
+import { useAuth } from '@/context/AuthContext'
+import { getUserProfile } from '@/lib/api'
+import { toast } from 'sonner'
 
 export default function Navbar() {
   const pathname = usePathname()
@@ -68,6 +76,25 @@ export default function Navbar() {
     const handleClick = (e: MouseEvent) => {
       if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
         setShowSuggestions(false)
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null)
+  const { totalItems } = useCart()
+  const { t, lang, setLang } = useTranslation()
+  const { user, logout } = useAuth()
+  const router = useRouter()
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  // Fetch profile photo
+  useEffect(() => {
+    if (!user) { setPhotoUrl(null); return }
+    getUserProfile(user.uid).then(p => setPhotoUrl(p?.photoUrl || null)).catch(() => {})
+  }, [user])
+
+  // Close user dropdown on outside click
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setUserMenuOpen(false)
       }
     }
     document.addEventListener('mousedown', handleClick)
@@ -133,6 +160,11 @@ export default function Navbar() {
     setSearchQuery('')
     setShowSuggestions(false)
     router.push(`/product/${product.id}`)
+  const handleLogout = async () => {
+    await logout()
+    toast.success('Signed out successfully')
+    router.push('/')
+    setUserMenuOpen(false)
   }
 
   return (
@@ -237,6 +269,31 @@ export default function Navbar() {
               </div>
             )}
           </div>
+          <Link href="/" className="flex items-center gap-2">
+            <Paintbrush className="w-6 h-6 text-primary" />
+            <h1 className="text-2xl font-bold text-primary">KalaSetu</h1>
+          </Link>
+
+          {/* Desktop Navigation */}
+          <div className="hidden md:flex items-center gap-8">
+            <Link href="/" className="text-sm font-outfit font-bold uppercase tracking-wider hover:text-primary transition-colors">
+              Home
+            </Link>
+            <Link href="/marketplace" className="text-sm font-outfit font-bold uppercase tracking-wider hover:text-primary transition-colors">
+              {t("marketplace")}
+            </Link>
+            <Link href="/reels" className="text-sm font-outfit font-bold uppercase tracking-wider hover:text-primary transition-colors">
+              Reels
+            </Link>
+            <Link href="/live" className="text-sm font-outfit font-bold uppercase tracking-wider hover:text-primary transition-colors">
+              Live
+            </Link>
+            <Link href="/origin" className="text-sm font-outfit font-bold uppercase tracking-wider hover:text-primary transition-colors">
+              Origin
+            </Link>
+          </div>
+
+
 
           {/* Desktop Actions */}
           <div className="navbar-actions">
@@ -270,6 +327,56 @@ export default function Navbar() {
             >
               <UserIcon className="w-[18px] h-[18px]" />
             </Link>
+            {user ? (
+              <div className="relative" ref={menuRef}>
+                <button
+                  onClick={() => setUserMenuOpen(!userMenuOpen)}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-secondary transition-colors"
+                >
+                  {photoUrl ? (
+                    <img src={photoUrl} alt={user.name} className="w-7 h-7 rounded-full object-cover" />
+                  ) : (
+                    <div className="w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold uppercase">
+                      {user.name.charAt(0)}
+                    </div>
+                  )}
+                  <span className="text-sm font-medium hidden lg:block max-w-[100px] truncate">{user.name}</span>
+                  <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                </button>
+                {userMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-48 bg-card border border-border rounded-xl shadow-lg py-1 z-50">
+                    <div className="px-4 py-2 border-b border-border">
+                      <p className="text-xs font-semibold text-foreground truncate">{user.name}</p>
+                      <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                    </div>
+                    <Link href="/dashboard" className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-secondary transition-colors" onClick={() => setUserMenuOpen(false)}>
+                      <LayoutDashboard className="w-4 h-4" /> Dashboard
+                    </Link>
+                    <Link href="/profile" className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-secondary transition-colors" onClick={() => setUserMenuOpen(false)}>
+                      <UserCircle className="w-4 h-4" /> My Profile
+                    </Link>
+                    <Link href="/orders" className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-secondary transition-colors" onClick={() => setUserMenuOpen(false)}>
+                      <Package className="w-4 h-4" /> My Orders
+                    </Link>
+                    <Link href="/sell" className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-secondary transition-colors" onClick={() => setUserMenuOpen(false)}>
+                      <Plus className="w-4 h-4" /> Sell a Painting
+                    </Link>
+                    <div className="border-t border-border mt-1" />
+                    <button
+                      onClick={handleLogout}
+                      className="w-full flex items-center gap-2 px-4 py-2 text-sm text-destructive hover:bg-destructive/5 transition-colors"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Sign Out
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <Link href="/login" className="p-2 hover:bg-secondary rounded-lg transition-colors">
+                <User className="w-5 h-5" />
+              </Link>
+            )}
           </div>
 
           {/* Mobile: Cart + Hamburger */}
@@ -418,6 +525,49 @@ export default function Navbar() {
             <span>{profileLabel}</span>
           </Link>
         </div>
+        {/* Mobile Menu */}
+        {mobileMenuOpen && (
+          <div className="md:hidden pb-4 space-y-3">
+
+            <Link href="/" className="block text-sm font-medium hover:text-primary transition-colors py-2">
+              Home
+            </Link>
+            <Link href="/marketplace" className="block text-sm font-medium hover:text-primary transition-colors py-2">
+              {t("marketplace")}
+            </Link>
+            <Link href="/reels" className="block text-sm font-medium hover:text-primary transition-colors py-2">
+              Reels
+            </Link>
+            <Link href="/live" className="block text-sm font-medium hover:text-primary transition-colors py-2">
+              Live
+            </Link>
+            <Link href="/origin" className="block text-sm font-medium hover:text-primary transition-colors py-2">
+              Origin
+            </Link>
+            <div className="py-2">
+              <select
+                value={lang}
+                onChange={(e) => setLang(e.target.value)}
+                className="w-full bg-secondary border border-border rounded px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+              >
+                <option value="en">English</option>
+                <option value="hi">हिंदी</option>
+              </select>
+            </div>
+            {user ? (
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-2 text-sm font-medium text-destructive hover:text-destructive/80 transition-colors py-2"
+              >
+                <LogOut className="w-4 h-4" /> Sign Out ({user.name})
+              </button>
+            ) : (
+              <Link href="/login" className="flex items-center gap-2 text-sm font-medium hover:text-primary transition-colors py-2">
+                <User className="w-4 h-4" /> Sign In / Register
+              </Link>
+            )}
+          </div>
+        )}
       </div>
     </>
   )
