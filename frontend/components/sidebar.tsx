@@ -47,7 +47,7 @@ export function Sidebar() {
             ◆
           </div>
           <p className="text-sidebar-foreground text-sm font-semibold mt-2">
-            CraftHub
+            KalaSetu
           </p>
         </div>
 

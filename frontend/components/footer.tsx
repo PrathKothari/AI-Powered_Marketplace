@@ -9,6 +9,8 @@ export default function Footer() {
         {/* Main Footer Content */}
         <div className="py-16 md:py-20 flex flex-col items-center text-center gap-8">
           {/* Brand Section */}
+          <div className="flex flex-col gap-4">
+            <h3 className="text-2xl font-bold text-primary">KalaSetu</h3>
           <div className="flex flex-col items-center gap-4 max-w-md">
             <div className="flex items-center gap-2">
               <Paintbrush className="w-8 h-8 text-primary" />
@@ -28,6 +30,9 @@ export default function Footer() {
         </div>
 
         {/* Bottom Footer */}
+        <div className="border-t border-border py-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <p className="text-muted-foreground text-sm">
+            © {currentYear} KalaSetu. All rights reserved.
         <div className="border-t border-border py-12 flex flex-col items-center justify-center text-center gap-6">
           <p className="text-muted-foreground text-sm font-medium">
             © {currentYear} KalaSetu Marketplace. All rights reserved.

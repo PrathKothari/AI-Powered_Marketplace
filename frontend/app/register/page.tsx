@@ -1,5 +1,9 @@
 'use client'
 
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useDispatch } from 'react-redux'
+import { setUser } from '@/store/slices/userSlice'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -28,6 +32,26 @@ const PASSWORD_RULES: PasswordRule[] = [
 
 export default function RegisterPage() {
   const router = useRouter()
+  const dispatch = useDispatch()
+
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    password: '',
+    role: 'buyer' as 'buyer' | 'artisan' | 'both'
+  })
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const roleParam = params.get('role') as 'buyer' | 'artisan'
+
+    if (roleParam) {
+      setFormData((prev) => ({ ...prev, role: roleParam }))
+    }
+  }, [])
+
+  const [isLoading, setIsLoading] = useState(false)
   const { register, loginWithGoogle, user } = useAuth()
 
   const [formData, setFormData] = useState({ name: '', email: '', password: '' })
@@ -136,6 +160,9 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4 py-8">
       <Card className="w-full max-w-md p-8 shadow-xl border-border space-y-6">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold text-foreground">Create Account</h1>
+          <p className="text-muted-foreground mt-2">Join KalaSetu today</p>
         {/* Header */}
         <div className="text-center space-y-2">
           <div className="flex justify-center mb-2">
@@ -202,6 +229,26 @@ export default function RegisterPage() {
 
           <div className="space-y-1.5">
             <label className="text-sm font-medium">Password</label>
+            <Input required type="password" name="password" placeholder="••••••••" value={formData.password} onChange={handleChange} />
+          </div>
+
+          <div className="space-y-3 pt-2">
+            <label className="text-sm font-medium">I want to:</label>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <label className={`border rounded-lg p-4 cursor-pointer transition-all ${formData.role === 'buyer' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'hover:bg-muted'}`}>
+                <input type="radio" name="role" value="buyer" className="hidden" checked={formData.role === 'buyer'} onChange={handleChange} />
+                <div className="font-semibold text-center mt-1">Buy Products</div>
+              </label>
+
+              <label className={`border rounded-lg p-4 cursor-pointer transition-all ${formData.role === 'artisan' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'hover:bg-muted'}`}>
+                <input type="radio" name="role" value="artisan" className="hidden" checked={formData.role === 'artisan'} onChange={handleChange} />
+                <div className="font-semibold text-center mt-1">Sell Products</div>
+              </label>
+
+              <label className={`border rounded-lg p-4 cursor-pointer transition-all ${formData.role === 'both' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'hover:bg-muted'}`}>
+                <input type="radio" name="role" value="both" className="hidden" checked={formData.role === 'both'} onChange={handleChange} />
+                <div className="font-semibold text-center mt-1">Buy & Sell</div>
+              </label>
             <div className="relative">
               <Input
                 required

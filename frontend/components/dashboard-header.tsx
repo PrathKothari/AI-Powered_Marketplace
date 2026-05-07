@@ -3,7 +3,7 @@ export function DashboardHeader() {
     <header className="bg-card border-b border-border">
       <div className="px-6 md:px-8 py-4 flex justify-between items-center max-w-7xl mx-auto">
         <div className="hidden md:block">
-          <h1 className="text-2xl font-bold text-foreground">CraftHub</h1>
+          <h1 className="text-2xl font-bold text-foreground">KalaSetu</h1>
         </div>
 
         <div className="flex items-center gap-4 ml-auto">

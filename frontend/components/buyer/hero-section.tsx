@@ -6,7 +6,7 @@ export default function HeroSection() {
       <div className="max-w-4xl mx-auto text-center py-20 sm:py-32">
         <div className="mb-8 inline-block">
           <span className="text-sm font-medium text-primary uppercase tracking-widest">
-            Artisan Marketplace
+            KalaSetu
           </span>
         </div>
 

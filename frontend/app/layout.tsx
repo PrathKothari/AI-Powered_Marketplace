@@ -11,6 +11,8 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-sans' })
 const outfit = Outfit({ subsets: ['latin'], variable: '--font-outfit' })
 
 export const metadata: Metadata = {
+  title: 'KalaSetu',
+  description: 'Discover authentic handmade crafts',
   title: 'KalaSetu Marketplace',
   description: 'Discover authentic handmade Indian crafts',
 }

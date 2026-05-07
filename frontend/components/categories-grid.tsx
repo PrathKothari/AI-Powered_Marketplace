@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { Card } from '@/components/ui/card'
 import Image from 'next/image'
 import { useEffect, useState } from 'react'
@@ -43,6 +44,23 @@ export default function CategoriesGrid() {
         </div>
 
         {/* Categories Grid */}
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+          {categories.map((category) => (
+            <Link
+              key={category.id}
+              href={`/marketplace?category=${encodeURIComponent(category.name.toLowerCase())}`}
+              className="group overflow-hidden h-48"
+            >
+              <Card className="cursor-pointer overflow-hidden bg-card border-border hover:shadow-lg transition-all duration-300 h-full">
+                <div className={`h-full flex items-center justify-center ${category.color} group-hover:scale-105 transition-transform duration-300`} style={{ backgroundImage: 'linear-gradient(135deg, rgba(0,0,0,0.03), rgba(0,0,0,0))' }}>
+                  <div className="text-center">
+                    <h3 className="text-xl md:text-2xl font-semibold text-foreground">{category.name}</h3>
+                  </div>
+                </div>
+              </Card>
+            </Link>
+          ))}
+        </div>
         {loading ? (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             {[...Array(8)].map((_, i) => (
