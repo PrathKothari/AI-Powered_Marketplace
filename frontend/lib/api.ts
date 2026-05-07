@@ -45,6 +45,58 @@ export async function fetchApi<T>(endpoint: string, options: FetchOptions = {}):
     }
 }
 
+export interface RecommendationSignal {
+    productId?: string
+    title?: string
+    style?: string | string[]
+    theme?: string | string[]
+    artist?: string
+    colorPalette?: string | string[]
+    price?: number
+    priceRange?: string
+    interactionType?: string
+    rating?: number
+    reviewCount?: number
+    stock?: number
+}
+
+export interface RecommendationRequestPayload {
+    userId?: string
+    cartItems?: RecommendationSignal[]
+    pastInteractions?: RecommendationSignal[]
+    catalogItems?: RecommendationSignal[]
+    excludeIds?: string[]
+    limit?: number
+}
+
+export interface RecommendationResultItem {
+    productId: string
+    title: string
+    style?: string | null
+    theme?: string | null
+    artist?: string | null
+    colorPalette: string[]
+    priceRange?: string | null
+    price?: number | null
+    rating?: number | null
+    reviewCount?: number | null
+    stock?: number | null
+    reason: string
+}
+
+export interface RecommendationResponse {
+    recommendations: RecommendationResultItem[]
+}
+
+export const getProductRecommendations = async (
+    payload: RecommendationRequestPayload,
+): Promise<RecommendationResponse> => {
+    return fetchApi<RecommendationResponse>('/recommendation', {
+        method: 'POST',
+        data: payload,
+    })
+}
+
 /**
  * JWT Token Management helpers
  */

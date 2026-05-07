@@ -10,7 +10,13 @@ import Link from 'next/link'
 import { toast } from 'sonner'
 import { useCart } from '@/context/CartContext'
 import { Product } from '@/lib/types/product'
-import { getCatalogProducts, getProductReviews, addProductReview } from '@/lib/api'
+import {
+  addProductReview,
+  getCatalogProducts,
+  getProductRecommendations,
+  getProductReviews,
+  RecommendationResultItem,
+} from '@/lib/api'
 import ProductCard from '@/components/product-card'
 import SellerBio from '@/components/SellerBio'
 
@@ -25,6 +31,8 @@ export default function ProductPage() {
   const [product, setProduct] = useState<Product | undefined>(undefined)
   const [allProducts, setAllProducts] = useState<Product[]>([])
   const [loadingProduct, setLoadingProduct] = useState(true)
+  const [recommendedProducts, setRecommendedProducts] = useState<Array<{ product: Product; reason: string }>>([])
+  const [loadingRecommendations, setLoadingRecommendations] = useState(false)
 
   // Reviews state
   interface Review { reviewId?: string; name: string; rating: number; comment: string; createdAt?: string; }
@@ -64,6 +72,108 @@ export default function ProductPage() {
     getProductReviews(productId).then(setReviews).catch(() => {})
   }, [productId])
 
+  useEffect(() => {
+    if (!product || allProducts.length === 0) {
+      setRecommendedProducts([])
+      return
+    }
+
+    let cancelled = false
+
+    const buildStatus = (stock?: number): Product['status'] => {
+      if (!stock || stock <= 0) return 'out-of-stock'
+      if (stock <= 5) return 'low-stock'
+      return 'in-stock'
+    }
+
+    const toFallbackProduct = (item: RecommendationResultItem): Product => ({
+      id: item.productId,
+      name: item.title,
+      price: item.price ?? 0,
+      images: [],
+      description: item.reason,
+      status: buildStatus(item.stock ?? undefined),
+      artisan: {
+        name: item.artist ?? 'Unknown Artisan',
+        location: '',
+        avatar: '',
+      },
+      category: item.theme ?? undefined,
+      rating: item.rating ?? 0,
+      relatedProducts: [],
+      stock: item.stock ?? 0,
+    })
+
+    const loadRecommendations = async () => {
+      setLoadingRecommendations(true)
+      try {
+        const catalogItems = allProducts.map((item) => ({
+          productId: String(item.id),
+          title: item.name,
+          theme: item.category ?? '',
+          artist: item.artisan?.name ?? '',
+          price: item.price,
+          rating: item.rating ?? 0,
+          stock: item.stock ?? 0,
+        }))
+
+        const response = await getProductRecommendations({
+          cartItems: [
+            {
+              productId: String(product.id),
+              title: product.name,
+              theme: product.category ?? '',
+              artist: product.artisan?.name ?? '',
+              price: product.price,
+              rating: product.rating ?? 0,
+              stock: product.stock ?? 0,
+            },
+          ],
+          catalogItems,
+          excludeIds: [String(product.id)],
+          limit: 6,
+        })
+
+        if (cancelled) return
+
+        const productMap = new Map(allProducts.map((item) => [String(item.id), item]))
+        const recommendations = response.recommendations
+          .map((item) => {
+            const matchedProduct = productMap.get(String(item.productId))
+            return {
+              product: matchedProduct ?? toFallbackProduct(item),
+              reason: item.reason,
+            }
+          })
+          .filter(Boolean)
+
+        setRecommendedProducts(recommendations)
+      } catch {
+        if (cancelled) return
+
+        const fallbackRecommendations = allProducts
+          .filter((item) => String(item.id) !== String(product.id))
+          .slice(0, 6)
+          .map((item) => ({
+            product: item,
+            reason: 'Recommended because it is a close fit for the selected product.',
+          }))
+
+        setRecommendedProducts(fallbackRecommendations)
+      } finally {
+        if (!cancelled) {
+          setLoadingRecommendations(false)
+        }
+      }
+    }
+
+    loadRecommendations()
+
+    return () => {
+      cancelled = true
+    }
+  }, [product, allProducts])
+
   const handleReviewSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newReviewName || !newReviewComment || submitting) return
@@ -97,20 +207,6 @@ export default function ProductPage() {
     return product.relatedProducts
       .map((id: string | number) => allProducts.find((item: Product) => String(item.id) === String(id)))
       .filter((p: Product | undefined): p is Product => Boolean(p))
-  }, [product, allProducts])
-
-  const recommendedCategoryProducts = useMemo<Product[]>(() => {
-    if (!product || allProducts.length === 0) return []
-    
-    // Filter by same category, excluding the current product
-    const sameCategory = allProducts.filter(p => p.category === product.category && String(p.id) !== String(product.id))
-    
-    // If none found in same category, use first 3 from allProducts (excluding current product)
-    if (sameCategory.length === 0) {
-       return allProducts.filter(p => String(p.id) !== String(product.id)).slice(0, 3)
-    }
-    
-    return sameCategory.slice(0, 3)
   }, [product, allProducts])
 
   const storyVideo = product?.storyVideo || 'https://www.w3schools.com/html/mov_bbb.mp4'
@@ -167,14 +263,14 @@ export default function ProductPage() {
 
               {/* Artisan Info */}
               <div className="flex items-center gap-3 mb-5 p-3 rounded-lg bg-slate-50 border border-slate-100">
-                <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold uppercase flex-shrink-0">
+                <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold uppercase shrink-0">
                   {product.artisan.name.charAt(0)}
                 </div>
                 <div className="flex-1">
                   <p className="text-sm font-semibold text-slate-800">{product.artisan.name}</p>
                   <p className="text-xs text-muted-foreground">{product.artisan.location}</p>
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
+                <div className="flex items-center gap-2 shrink-0">
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                     ✓ Verified Artisan
                   </span>
@@ -339,12 +435,30 @@ export default function ProductPage() {
 
         {/* You may also like Section */}
         <div className="mt-20">
-          <h2 className="text-2xl font-bold text-slate-900 mb-8 border-b border-border pb-4">You may also like</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-            {recommendedCategoryProducts.map((p) => (
-              <ProductCard key={p.id} product={p as Product} onDeleteAction={() => {}} />
-            ))}
+          <div className="flex items-end justify-between gap-4 mb-8 border-b border-border pb-4">
+            <div>
+              <h2 className="text-2xl font-bold text-slate-900">Recommended for this product</h2>
+              <p className="text-sm text-muted-foreground mt-1">Products matched against {product.name}.</p>
+            </div>
+            {loadingRecommendations && (
+              <span className="text-sm text-muted-foreground">Finding matches...</span>
+            )}
           </div>
+
+          {recommendedProducts.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+              {recommendedProducts.map(({ product: recommendedProduct, reason }) => (
+                <div key={recommendedProduct.id} className="space-y-2">
+                  <ProductCard product={recommendedProduct} onDeleteAction={() => {}} />
+                  <p className="text-xs text-muted-foreground px-1 leading-relaxed">{reason}</p>
+                </div>
+              ))}
+            </div>
+          ) : !loadingRecommendations ? (
+            <div className="rounded-xl border border-dashed border-border bg-white p-6 text-sm text-muted-foreground">
+              No recommendations available for this product right now.
+            </div>
+          ) : null}
         </div>
       </div>
     </div>
