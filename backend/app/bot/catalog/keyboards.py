@@ -19,7 +19,7 @@ def categories_keyboard(categories: list[dict]) -> InlineKeyboardMarkup:
         row = [
             InlineKeyboardButton(
                 text=cat.get("name", cat["id"]),
-                callback_data=f"cat:{cat['id']}:0",
+                callback_data=f"cat:{cat.get('name', cat['id'])}:0",
             )
             for cat in pair
         ]

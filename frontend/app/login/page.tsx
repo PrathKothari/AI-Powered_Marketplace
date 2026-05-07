@@ -92,8 +92,6 @@ export default function LoginPage() {
               <Paintbrush className="w-6 h-6 text-primary" />
             </div>
           </div>
-          <h1 className="text-3xl font-bold text-foreground">Welcome Back</h1>
-          <p className="text-muted-foreground mt-2">Sign in to continue to KalaSetu</p>
           <h1 className="text-2xl font-bold text-foreground">Welcome Back</h1>
           <p className="text-sm text-muted-foreground">Sign in to KalaSetu</p>
         </div>

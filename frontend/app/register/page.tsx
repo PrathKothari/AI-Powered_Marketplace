@@ -2,10 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useDispatch } from 'react-redux'
-import { setUser } from '@/store/slices/userSlice'
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Check, X, Paintbrush, Eye, EyeOff, Mail } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -32,36 +28,30 @@ const PASSWORD_RULES: PasswordRule[] = [
 
 export default function RegisterPage() {
   const router = useRouter()
-  const dispatch = useDispatch()
+  const { register, loginWithGoogle, user } = useAuth()
 
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
-    role: 'buyer' as 'buyer' | 'artisan' | 'both'
+    role: 'buyer' as 'buyer' | 'artisan' | 'both',
   })
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    const params = new URLSearchParams(window.location.search)
-    const roleParam = params.get('role') as 'buyer' | 'artisan'
-
-    if (roleParam) {
-      setFormData((prev) => ({ ...prev, role: roleParam }))
-    }
-  }, [])
-
-  const [isLoading, setIsLoading] = useState(false)
-  const { register, loginWithGoogle, user } = useAuth()
-
-  const [formData, setFormData] = useState({ name: '', email: '', password: '' })
   const [loading, setLoading] = useState(false)
   const [googleReady, setGoogleReady] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [emailSent, setEmailSent] = useState(false)
   const [apiError, setApiError] = useState<string | null>(null)
 
-  useEffect(() => { if (user) router.replace('/marketplace') }, [user, router])
+  useEffect(() => {
+    if (user) router.replace('/marketplace')
+  }, [user, router])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const roleParam = params.get('role') as 'buyer' | 'artisan' | null
+    if (roleParam) setFormData((prev) => ({ ...prev, role: roleParam }))
+  }, [])
 
   useEffect(() => {
     const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
@@ -106,6 +96,7 @@ export default function RegisterPage() {
       return
     }
     setLoading(true)
+    setApiError(null)
     try {
       await register(formData.name, formData.email, formData.password)
       setEmailSent(true)
@@ -160,10 +151,6 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4 py-8">
       <Card className="w-full max-w-md p-8 shadow-xl border-border space-y-6">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold text-foreground">Create Account</h1>
-          <p className="text-muted-foreground mt-2">Join KalaSetu today</p>
-        {/* Header */}
         <div className="text-center space-y-2">
           <div className="flex justify-center mb-2">
             <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
@@ -174,7 +161,6 @@ export default function RegisterPage() {
           <p className="text-sm text-muted-foreground">Join KalaSetu today</p>
         </div>
 
-        {/* Google Sign-Up */}
         {process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID && (
           <Button
             type="button"
@@ -202,7 +188,6 @@ export default function RegisterPage() {
           </div>
         </div>
 
-        {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
             <label className="text-sm font-medium">Full Name</label>
@@ -211,14 +196,14 @@ export default function RegisterPage() {
 
           <div className="space-y-1.5">
             <label className="text-sm font-medium">Email</label>
-            <Input 
-              required 
-              type="email" 
-              name="email" 
-              placeholder="hello@example.com" 
-              value={formData.email} 
+            <Input
+              required
+              type="email"
+              name="email"
+              placeholder="hello@example.com"
+              value={formData.email}
               onChange={handleChange}
-              className={apiError ? "border-destructive focus-visible:ring-destructive" : ""}
+              className={apiError ? 'border-destructive focus-visible:ring-destructive' : ''}
             />
             {apiError && (
               <p className="text-[11px] font-medium text-destructive mt-1 animate-in fade-in slide-in-from-top-1">
@@ -229,26 +214,6 @@ export default function RegisterPage() {
 
           <div className="space-y-1.5">
             <label className="text-sm font-medium">Password</label>
-            <Input required type="password" name="password" placeholder="••••••••" value={formData.password} onChange={handleChange} />
-          </div>
-
-          <div className="space-y-3 pt-2">
-            <label className="text-sm font-medium">I want to:</label>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <label className={`border rounded-lg p-4 cursor-pointer transition-all ${formData.role === 'buyer' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'hover:bg-muted'}`}>
-                <input type="radio" name="role" value="buyer" className="hidden" checked={formData.role === 'buyer'} onChange={handleChange} />
-                <div className="font-semibold text-center mt-1">Buy Products</div>
-              </label>
-
-              <label className={`border rounded-lg p-4 cursor-pointer transition-all ${formData.role === 'artisan' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'hover:bg-muted'}`}>
-                <input type="radio" name="role" value="artisan" className="hidden" checked={formData.role === 'artisan'} onChange={handleChange} />
-                <div className="font-semibold text-center mt-1">Sell Products</div>
-              </label>
-
-              <label className={`border rounded-lg p-4 cursor-pointer transition-all ${formData.role === 'both' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'hover:bg-muted'}`}>
-                <input type="radio" name="role" value="both" className="hidden" checked={formData.role === 'both'} onChange={handleChange} />
-                <div className="font-semibold text-center mt-1">Buy & Sell</div>
-              </label>
             <div className="relative">
               <Input
                 required
@@ -265,14 +230,9 @@ export default function RegisterPage() {
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                 tabIndex={-1}
               >
-                {showPassword ? (
-                  <EyeOff className="w-4 h-4" />
-                ) : (
-                  <Eye className="w-4 h-4" />
-                )}
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
-            {/* Password strength rules */}
             {formData.password.length > 0 && (
               <ul className="mt-2 space-y-1">
                 {PASSWORD_RULES.map((rule) => {
@@ -288,9 +248,26 @@ export default function RegisterPage() {
             )}
           </div>
 
-          <Button 
-            type="submit" 
-            className="w-full font-outfit font-bold uppercase tracking-wider h-12 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] hover:shadow-lg shadow-md" 
+          <div className="space-y-2 pt-1">
+            <label className="text-sm font-medium">I want to:</label>
+            <div className="grid grid-cols-3 gap-3">
+              {(['buyer', 'artisan', 'both'] as const).map((r) => (
+                <label
+                  key={r}
+                  className={`border rounded-lg p-3 cursor-pointer transition-all text-center ${formData.role === r ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'hover:bg-muted'}`}
+                >
+                  <input type="radio" name="role" value={r} className="hidden" checked={formData.role === r} onChange={handleChange} />
+                  <div className="font-semibold text-sm">
+                    {r === 'buyer' ? 'Buy Products' : r === 'artisan' ? 'Sell Products' : 'Buy & Sell'}
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <Button
+            type="submit"
+            className="w-full font-outfit font-bold uppercase tracking-wider h-12 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] hover:shadow-lg shadow-md"
             disabled={loading || !passwordValid}
           >
             {loading ? 'Creating account...' : 'Create Account'}

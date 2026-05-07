@@ -7,10 +7,18 @@ def init_firebase():
     Initializes the Firebase Admin SDK using credentials from settings.
     """
     if not firebase_admin._apps:
+        raw_key = settings.FIREBASE_PRIVATE_KEY.strip()
+        # Strip surrounding quotes left by some dotenv parsers
+        if (raw_key.startswith('"') and raw_key.endswith('"')) or \
+           (raw_key.startswith("'") and raw_key.endswith("'")):
+            raw_key = raw_key[1:-1]
+        # Normalise literal \n → real newlines (idempotent if already real)
+        private_key = raw_key.replace('\\n', '\n')
+
         cert_dict = {
             "type": "service_account",
             "project_id": settings.FIREBASE_PROJECT_ID,
-            "private_key": settings.FIREBASE_PRIVATE_KEY.replace('\\n', '\n'),
+            "private_key": private_key,
             "client_email": settings.FIREBASE_CLIENT_EMAIL,
             "auth_uri": "https://accounts.google.com/o/oauth2/auth",
             "token_uri": "https://oauth2.googleapis.com/token",

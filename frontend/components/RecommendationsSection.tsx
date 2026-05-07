@@ -96,12 +96,12 @@ export default function RecommendationsSection({
           return (
             <Link key={rec.productId} href={`/product/${rec.productId}`}>
               <Card className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer group bg-white">
-                <div className="aspect-square bg-slate-100 overflow-hidden">
+                <div className="aspect-square bg-white overflow-hidden flex items-center justify-center">
                   {image ? (
                     <img
                       src={image}
                       alt={rec.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-slate-300">

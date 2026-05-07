@@ -384,6 +384,7 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
                 response_text,
                 parse_mode=ParseMode.MARKDOWN,
                 disable_web_page_preview=True,
+                reply_markup=main_menu_keyboard(),
             )
             return
 
@@ -428,6 +429,7 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
             response_text,
             parse_mode=ParseMode.MARKDOWN,
             disable_web_page_preview=False,
+            reply_markup=main_menu_keyboard(),
         )
 
         # 4. Send product images if available
@@ -446,6 +448,7 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         logger.error("Text handler error: %s", e, exc_info=True)
         await update.message.reply_text(
             "😅 Oops, something went wrong on my end. Let's try that again!",
+            reply_markup=main_menu_keyboard(),
         )
 
 
@@ -517,6 +520,7 @@ async def handle_image_message(update: Update, context: ContextTypes.DEFAULT_TYP
             response_text,
             parse_mode=ParseMode.MARKDOWN,
             disable_web_page_preview=False,
+            reply_markup=main_menu_keyboard(),
         )
 
         for product in matched_products[:3]:
@@ -534,4 +538,5 @@ async def handle_image_message(update: Update, context: ContextTypes.DEFAULT_TYP
         logger.error("Image search error: %s", e, exc_info=True)
         await update.message.reply_text(
             "😅 Had trouble analyzing that image. Could you try a different photo?",
+            reply_markup=main_menu_keyboard(),
         )

@@ -5,9 +5,6 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { ArrowRight, ShoppingBag, Sparkles, Star } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { ArrowRight } from 'lucide-react'
-import Image from 'next/image'
-import Link from 'next/link'
 
 export default function HeroSection() {
   const [isMounted, setIsMounted] = useState(false)
@@ -18,7 +15,7 @@ export default function HeroSection() {
 
   return (
     <section className="relative min-h-[90vh] flex items-center overflow-hidden bg-[#fdfcf8] py-12 md:py-24">
-      {/* Dynamic Background Elements */}
+      {/* Background Elements */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-0 left-0 w-full h-full opacity-30 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:24px_24px]" />
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-primary/5 blur-[120px] animate-pulse" />
@@ -27,7 +24,7 @@ export default function HeroSection() {
 
       <div className="container mx-auto px-6 relative z-10">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-          
+
           {/* Left Content Column */}
           <div className={cn(
             "flex flex-col gap-8 transition-all duration-1000",
@@ -38,12 +35,12 @@ export default function HeroSection() {
                 <Sparkles className="w-3.5 h-3.5" />
                 <span>The Home of Craftsmanship</span>
               </div>
-              
+
               <h1 className="text-4xl md:text-5xl lg:text-7xl font-black text-slate-900 leading-[1.1] tracking-tight">
                 Crafting <span className="text-primary italic">Stories</span>, <br />
                 One Piece at a Time.
               </h1>
-              
+
               <p className="text-lg md:text-xl text-slate-500 max-w-xl leading-relaxed font-medium">
                 Explore a curated collection of handmade treasures from independent artisans worldwide. Authenticity in every stitch, fold, and fire.
               </p>
@@ -60,16 +57,7 @@ export default function HeroSection() {
                   <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
                 </Link>
               </Button>
-              
-              <Link href="/marketplace">
-                <Button
-                  size="lg"
-                  className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg font-outfit font-bold uppercase tracking-wider group text-sm transition-all hover:scale-105 active:scale-95"
-                >
-                  Explore Products
-                  <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
-                </Button>
-              </Link>
+
               <Button
                 asChild
                 variant="outline"
@@ -77,26 +65,23 @@ export default function HeroSection() {
                 className="h-14 px-8 rounded-2xl border-2 border-slate-200 hover:border-primary hover:text-primary transition-all duration-300 font-bold"
               >
                 <Link href="/register?role=artisan">Join as Artisan</Link>
-                className="border-primary text-primary hover:bg-primary hover:text-white rounded-lg font-outfit font-bold uppercase tracking-wider text-sm transition-all hover:scale-105 active:scale-95"
-              >
-                Share Your Art
               </Button>
             </div>
 
             <div className="flex items-center gap-6 mt-4 pt-6 border-t border-slate-100">
-               <div className="flex -space-x-3">
-                  {[1,2,3,4].map((i) => (
-                    <div key={i} className="w-10 h-10 rounded-full border-2 border-white bg-slate-200 ring-2 ring-slate-50 flex items-center justify-center text-[10px] font-bold text-slate-400 overflow-hidden">
-                       <img src={`https://i.pravatar.cc/100?u=${i}`} alt="user" className="w-full h-full object-cover" />
-                    </div>
-                  ))}
-               </div>
-               <div className="space-y-0.5">
-                  <div className="flex items-center gap-1 text-amber-500">
-                    {[1,2,3,4,5].map((i) => <Star key={i} className="w-3.5 h-3.5 fill-current" />)}
+              <div className="flex -space-x-3">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="w-10 h-10 rounded-full border-2 border-white bg-slate-200 ring-2 ring-slate-50 flex items-center justify-center text-[10px] font-bold text-slate-400 overflow-hidden">
+                    <img src={`https://i.pravatar.cc/100?u=${i}`} alt="user" className="w-full h-full object-cover" />
                   </div>
-                  <p className="text-xs text-slate-500 font-bold">Trusted by 10k+ craft lovers</p>
-               </div>
+                ))}
+              </div>
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-1 text-amber-500">
+                  {[1, 2, 3, 4, 5].map((i) => <Star key={i} className="w-3.5 h-3.5 fill-current" />)}
+                </div>
+                <p className="text-xs text-slate-500 font-bold">Trusted by 10k+ craft lovers</p>
+              </div>
             </div>
           </div>
 
@@ -111,7 +96,7 @@ export default function HeroSection() {
                 alt="Artisan Workshop"
                 className="w-full aspect-[4/5] object-cover transition-transform duration-1000 group-hover:scale-110"
               />
-              
+
               {/* Floating Overlay Card */}
               <div className="absolute bottom-8 left-8 right-8 p-6 glass-card rounded-2xl border border-white/20 shadow-xl backdrop-blur-md bg-white/10 group-hover:-translate-y-2 transition-transform duration-500">
                 <div className="flex items-center justify-between">
@@ -120,30 +105,21 @@ export default function HeroSection() {
                     <h3 className="text-xl font-bold text-white tracking-tight">Hand-Thrown Ceramic Vase</h3>
                   </div>
                   <div className="h-12 w-12 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-md transition-colors group-hover:bg-primary">
-                     <ShoppingBag className="w-6 h-6 text-white" />
+                    <ShoppingBag className="w-6 h-6 text-white" />
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Decorative behind elements */}
+            {/* Decorative blur elements */}
             <div className="absolute -top-12 -right-12 w-64 h-64 bg-accent/10 rounded-full blur-[80px] -z-10 animate-pulse" />
             <div className="absolute -bottom-12 -left-12 w-64 h-64 bg-primary/10 rounded-full blur-[80px] -z-10" />
-            
+
             {/* Experience Badge */}
             <div className="absolute -top-6 -left-6 h-24 w-24 rounded-full bg-white shadow-xl flex flex-col items-center justify-center p-2 z-20 animate-spin-slow">
-               <span className="text-lg font-black text-slate-900">100%</span>
-               <span className="text-[10px] font-bold text-slate-400 uppercase leading-none">Organic</span>
+              <span className="text-lg font-black text-slate-900">100%</span>
+              <span className="text-[10px] font-bold text-slate-400 uppercase leading-none">Organic</span>
             </div>
-          {/* Right Image */}
-          <div className="relative h-96 md:h-full min-h-96">
-            <Image
-              src="https://firebasestorage.googleapis.com/v0/b/ai-market-asst-1.firebasestorage.app/o/dataset%2Fmadhubani%2Fmadhubani0.jpg?alt=media&token=770c03a1-9df2-43a8-a9c7-addb89ca132a"
-              alt="Hand-painted Madhubani Masterpiece"
-              fill
-              className="object-cover rounded-xl shadow-2xl"
-              priority
-            />
           </div>
 
         </div>

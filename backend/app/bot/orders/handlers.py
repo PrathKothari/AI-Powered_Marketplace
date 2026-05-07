@@ -6,6 +6,7 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from firebase_admin import firestore as fa_firestore
+from google.cloud.firestore_v1.base_query import FieldFilter
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.constants import ParseMode
 from telegram.ext import (
@@ -270,8 +271,7 @@ async def _send_orders_page(
     try:
         docs = (
             db.collection("orders")
-            .where("userId", "==", uid)
-            .order_by("createdAt", direction=fa_firestore.Query.DESCENDING)
+            .where(filter=FieldFilter("userId", "==", uid))
             .limit(50)
             .stream()
         )
@@ -280,6 +280,7 @@ async def _send_orders_page(
             o = doc.to_dict() or {}
             o["id"] = doc.id
             all_orders.append(o)
+        all_orders.sort(key=lambda x: x.get("createdAt") or "", reverse=True)
     except Exception as exc:
         logger.error("Failed to fetch orders for uid %s: %s", uid, exc)
         all_orders = []
@@ -406,7 +407,7 @@ async def show_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     try:
         product_docs = (
             db.collection("products")
-            .where("artisanId", "==", uid)
+            .where(filter=FieldFilter("artisanId", "==", uid))
             .limit(100)
             .stream()
         )
@@ -426,8 +427,7 @@ async def show_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     try:
         order_docs = (
             db.collection("orders")
-            .where("paymentStatus", "==", "paid")
-            .order_by("createdAt", direction=fa_firestore.Query.DESCENDING)
+            .where(filter=FieldFilter("paymentStatus", "==", "paid"))
             .limit(100)
             .stream()
         )

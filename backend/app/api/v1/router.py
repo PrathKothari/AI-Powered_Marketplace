@@ -16,6 +16,7 @@ from app.api.v1.endpoints import (
     payments,
     chat,
     bot_webhook,
+    uploads,
 )
 
 api_router = APIRouter()
@@ -36,3 +37,4 @@ api_router.include_router(orders.router, prefix="/orders", tags=["Orders"])
 api_router.include_router(payments.router, prefix="/payments", tags=["Payments"])
 api_router.include_router(chat.router, prefix="/chat", tags=["Chat"])
 api_router.include_router(bot_webhook.router, prefix="/bot-webhook", tags=["Bot Webhook"])
+api_router.include_router(uploads.router, prefix="/uploads", tags=["Uploads"])

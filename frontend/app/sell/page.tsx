@@ -3,15 +3,14 @@
 import { Suspense, useState, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { QRCodeSVG } from 'qrcode.react'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Mic, MicOff, UploadCloud, X, Loader, Video, User } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
 import { toast } from 'sonner'
-import { createListing, getCategories, createCategory, getUserProfile, generateStoryVideo } from '@/lib/api'
+import { createListing, getCategories, createCategory, getUserProfile, generateReel, getReelStatus } from '@/lib/api'
 import { uploadImage } from '@/lib/storage'
 import { useAuth } from '@/context/AuthContext'
-import { Mic, MicOff, UploadCloud, X, Loader, Video, User } from 'lucide-react'
 import Link from 'next/link'
 
 export default function SellPageWrapper() {
@@ -34,21 +33,16 @@ function SellPage() {
   const [hasBio, setHasBio] = useState(true)
 
   const [viewState, setViewState] = useState<'form' | 'generating' | 'preview' | 'success'>('form')
-
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [successData, setSuccessData] = useState<any>(null)
-  
-  // Voice recording state
+
   const [isRecording, setIsRecording] = useState(false)
   const recognitionRef = useRef<any>(null)
 
   const [uploadingImages, setUploadingImages] = useState(false)
   const [imageFiles, setImageFiles] = useState<File[]>([])
-
-  // Generated reel video state
   const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string>('')
   const [uploadedImageUrls, setUploadedImageUrls] = useState<string[]>([])
-  const [generationError, setGenerationError] = useState<string>('')
 
   const [formData, setFormData] = useState({
     title: '',
@@ -64,16 +58,9 @@ function SellPage() {
   const [customCraftType, setCustomCraftType] = useState('')
 
   useEffect(() => {
-    const fetchCats = async () => {
-      try {
-        const cats = await getCategories()
-        setCategories(cats)
-      } catch (e) {}
-    }
-    fetchCats()
+    getCategories().then(setCategories).catch(() => {})
   }, [])
 
-  // Check if user has bio
   useEffect(() => {
     if (!user) return
     getUserProfile(user.uid)
@@ -81,45 +68,28 @@ function SellPage() {
       .catch(() => {})
   }, [user])
 
-  // Init Speech Recognition
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-      if (SpeechRecognition) {
-        recognitionRef.current = new SpeechRecognition()
-        recognitionRef.current.continuous = true
-        recognitionRef.current.interimResults = true
-
-        recognitionRef.current.onresult = (event: any) => {
-          let finalTranscript = ''
-          for (let i = event.resultIndex; i < event.results.length; ++i) {
-            if (event.results[i].isFinal) {
-              finalTranscript += event.results[i][0].transcript
-            }
-          }
-          if (finalTranscript) {
-            setFormData(prev => ({
-              ...prev,
-              description: prev.description ? prev.description + ' ' + finalTranscript : finalTranscript
-            }))
-          }
-        }
-
-        recognitionRef.current.onerror = (e: any) => {
-          setIsRecording(false)
-        }
-        recognitionRef.current.onend = () => {
-          setIsRecording(false)
-        }
+    if (typeof window === 'undefined') return
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    if (!SpeechRecognition) return
+    recognitionRef.current = new SpeechRecognition()
+    recognitionRef.current.continuous = true
+    recognitionRef.current.interimResults = true
+    recognitionRef.current.onresult = (event: any) => {
+      let finalTranscript = ''
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript
+      }
+      if (finalTranscript) {
+        setFormData(prev => ({ ...prev, description: prev.description ? prev.description + ' ' + finalTranscript : finalTranscript }))
       }
     }
+    recognitionRef.current.onerror = () => setIsRecording(false)
+    recognitionRef.current.onend = () => setIsRecording(false)
   }, [])
 
   const toggleRecording = () => {
-    if (!recognitionRef.current) {
-      toast.error("Voice typing is not supported in this browser.")
-      return
-    }
+    if (!recognitionRef.current) { toast.error("Voice typing is not supported in this browser."); return }
     if (isRecording) {
       recognitionRef.current.stop()
       setIsRecording(false)
@@ -128,79 +98,68 @@ function SellPage() {
         recognitionRef.current.start()
         setIsRecording(true)
         toast.info("Listening... Speak now.")
-      } catch(e) {
-        // Handle race conditions
+      } catch (e) {
         recognitionRef.current.stop()
       }
     }
   }
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
   }
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const files = Array.from(e.target.files)
-      // Store files for later upload, and show previews using blob URLs
-      setImageFiles(prev => [...prev, ...files])
-      const newUrls = files.map(f => URL.createObjectURL(f))
-      setFormData(prev => ({
-        ...prev,
-        images: [...prev.images, ...newUrls]
-      }))
-    }
+    if (!e.target.files) return
+    const files = Array.from(e.target.files)
+    setImageFiles(prev => [...prev, ...files])
+    const newUrls = files.map(f => URL.createObjectURL(f))
+    setFormData(prev => ({ ...prev, images: [...prev.images, ...newUrls] }))
   }
 
   const removeImage = (index: number) => {
     setImageFiles(prev => prev.filter((_, i) => i !== index))
-    setFormData(prev => ({
-      ...prev,
-      images: prev.images.filter((_, i) => i !== index)
-    }))
+    setFormData(prev => ({ ...prev, images: prev.images.filter((_, i) => i !== index) }))
   }
 
   const handleProceedToReel = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!user) {
-      toast.error('Please sign in to list a product')
-      router.push('/login')
-      return
-    }
-    if (formData.craftType === 'Other' && !customCraftType.trim()) {
-      toast.error('Please specify your custom craft type.')
-      return
-    }
-    if (formData.images.length === 0) {
-      toast.error('Please attach at least one image.')
-      return
-    }
+    if (!user) { toast.error('Please sign in to list a product'); router.push('/login'); return }
+    if (formData.craftType === 'Other' && !customCraftType.trim()) { toast.error('Please specify your custom craft type.'); return }
+    if (formData.images.length === 0) { toast.error('Please attach at least one image.'); return }
 
-    setGenerationError('')
     setViewState('generating')
-
     try {
-      // Step 1: Upload images to Firebase Storage (needed for both the reel pipeline and the final listing)
       const imageUrls = await Promise.all(imageFiles.map(f => uploadImage(f)))
       setUploadedImageUrls(imageUrls)
 
-      // Step 2: Call the storytelling API to generate the reel
-      const result = await generateStoryVideo({
+      const tempProductId = crypto.randomUUID()
+      const job = await generateReel({
+        productId: tempProductId,
+        imageUrls,
         description: formData.description,
-        image_urls: imageUrls,
-        product_name: formData.title,
+        productName: formData.title,
         tone: 'premium',
         audience: 'online shoppers',
-        style_preset: 'museum_cinematic',
-        duration_per_image: 4,
+        stylePreset: 'museum_cinematic',
       })
 
-      setGeneratedVideoUrl(result.video_url)
+      // Poll until complete (max 5 min)
+      let videoUrl = ''
+      for (let i = 0; i < 60; i++) {
+        await new Promise(r => setTimeout(r, 5000))
+        const status = await getReelStatus(job.jobId)
+        if (status.status === 'complete' && status.videoUrl) {
+          videoUrl = status.videoUrl
+          break
+        }
+        if (status.status === 'failed') throw new Error(status.error || 'Reel generation failed')
+      }
+
+      if (!videoUrl) throw new Error('Reel generation timed out')
+      setGeneratedVideoUrl(videoUrl)
       setViewState('preview')
       toast.success('AI Craft Reel Generated!')
     } catch (err: any) {
-      console.error('Reel generation failed:', err)
-      setGenerationError(err.message || 'Reel generation failed')
       toast.error(err.message || 'Reel generation failed')
       setViewState('form')
     }
@@ -212,21 +171,15 @@ function SellPage() {
       let finalCraftType = formData.craftType
       if (finalCraftType === 'Other') {
         finalCraftType = customCraftType.trim()
-        try {
-          await createCategory(finalCraftType, "User-submitted category")
-        } catch(e) {
-          console.warn("Could not create new category", e)
-        }
+        try { await createCategory(finalCraftType, "User-submitted category") } catch (e) {}
       }
 
-      // Images were already uploaded during reel generation — reuse those URLs.
-      // Fallback: if somehow empty, upload now.
       let imageUrls = uploadedImageUrls
       if (imageUrls.length === 0) {
         setUploadingImages(true)
         try {
           imageUrls = await Promise.all(imageFiles.map(f => uploadImage(f)))
-        } catch (err) {
+        } catch {
           toast.error('Image upload failed. Please try again.')
           setIsSubmitting(false)
           setUploadingImages(false)
@@ -270,11 +223,7 @@ function SellPage() {
     img.onload = () => {
       canvas.width = img.width
       canvas.height = img.height
-      if (ctx) {
-        ctx.fillStyle = 'white'
-        ctx.fillRect(0, 0, canvas.width, canvas.height)
-        ctx.drawImage(img, 0, 0)
-      }
+      if (ctx) { ctx.fillStyle = 'white'; ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.drawImage(img, 0, 0) }
       const link = document.createElement('a')
       link.download = `product-qr-${successData.productId}.png`
       link.href = canvas.toDataURL('image/png')
@@ -283,18 +232,6 @@ function SellPage() {
     img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)))
   }
 
-  if (successData) {
-     return (
-        <main className="min-h-screen bg-slate-50 px-4 py-10 flex flex-col items-center justify-center">
-          <Card className="max-w-md w-full rounded-2xl shadow-xl p-8 space-y-8 text-center border-t-8 border-t-primary">
-            <div className="space-y-2">
-              <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                 <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                 </svg>
-              </div>
-              <h2 className="text-3xl font-bold text-foreground">Product Published!</h2>
-              <p className="text-muted-foreground">Your product is now listed on KalaSetu.</p>
   if (viewState === 'generating') {
     return (
       <main className="min-h-screen bg-slate-50 flex flex-col items-center justify-center px-4">
@@ -312,66 +249,37 @@ function SellPage() {
     )
   }
 
-            <div className="p-6 border-2 border-primary/20 bg-primary/5 rounded-xl shadow-inner relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-24 h-24 bg-primary/10 rounded-full -mr-10 -mt-10 blur-xl"></div>
-                <div className="absolute bottom-0 left-0 w-24 h-24 bg-secondary/10 rounded-full -ml-10 -mb-10 blur-xl"></div>
-                
-                <h3 className="font-bold text-lg mb-6 text-foreground relative z-10 flex items-center justify-center gap-2">
-                    <span className="text-primary">✨</span> Digital Authenticity Card
-                </h3>
-                
-                <div className="inline-flex justify-center bg-white p-4 rounded-xl shadow-md mx-auto relative z-10 hover:scale-105 transition-transform">
-                    <QRCodeSVG id="qr-code-svg" value={`http://localhost:3000/product/${successData.id}`} size={180} level={"H"} />
-                </div>
-                
-                <p className="mt-6 text-sm text-primary font-semibold relative z-10 uppercase tracking-wider">
-                  This QR verifies product authenticity
-                </p>
-                
-                <div className="mt-6 text-left space-y-3 text-sm bg-white/60 p-4 rounded-lg backdrop-blur-sm relative z-10">
-                    <div className="flex justify-between border-b border-black/5 pb-2">
-                      <span className="text-muted-foreground">Product ID</span>
-                      <span className="font-mono font-medium">{successData.id}</span>
-                    </div>
-                    <div className="flex justify-between border-b border-black/5 pb-2">
-                      <span className="text-muted-foreground">Artisan</span>
-                      <span className="font-medium text-foreground">Sofia (Mock Data)</span>
-                    </div>
-                </div>
   if (viewState === 'preview') {
     return (
       <main className="min-h-screen bg-slate-50 px-4 py-10 flex flex-col items-center justify-center">
         <Card className="max-w-2xl w-full rounded-2xl shadow-xl p-8 space-y-8 text-center border-t-8 border-t-primary bg-white">
           <div className="space-y-2">
-             <div className="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-2">
-                 <Video className="w-6 h-6 text-primary" />
-             </div>
-             <h2 className="text-3xl font-outfit font-bold uppercase text-foreground">Your Craft Reel is Ready!</h2>
-             <p className="text-muted-foreground text-sm">This AI-generated reel will be displayed on your product page to uniquely showcase your story to buyers.</p>
+            <div className="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-2">
+              <Video className="w-6 h-6 text-primary" />
+            </div>
+            <h2 className="text-3xl font-outfit font-bold uppercase text-foreground">Your Craft Reel is Ready!</h2>
+            <p className="text-muted-foreground text-sm">This AI-generated reel will be displayed on your product page to uniquely showcase your story to buyers.</p>
           </div>
-          
+
           <div className="relative w-full aspect-[9/16] max-h-[60vh] bg-black rounded-lg overflow-hidden flex items-center justify-center shadow-md border border-border mx-auto">
-             {generatedVideoUrl ? (
-               <video
-                  src={generatedVideoUrl.startsWith('/') ? `${process.env.NEXT_PUBLIC_API_URL?.replace('/api/v1', '') || 'http://localhost:8001'}${generatedVideoUrl}` : generatedVideoUrl}
-                  controls
-                  autoPlay
-                  loop
-                  playsInline
-                  className="w-full h-full object-contain"
-               />
-             ) : (
-               <p className="text-white text-sm">No video available</p>
-             )}
+            {generatedVideoUrl ? (
+              <video
+                src={generatedVideoUrl.startsWith('/') ? `${process.env.NEXT_PUBLIC_API_URL?.replace('/api/v1', '') || 'http://localhost:8001'}${generatedVideoUrl}` : generatedVideoUrl}
+                controls autoPlay loop playsInline
+                className="w-full h-full object-contain"
+              />
+            ) : (
+              <p className="text-white text-sm">No video available</p>
+            )}
           </div>
 
           <div className="flex gap-4 pt-4">
-             <Button variant="outline" onClick={() => setViewState('form')} className="flex-1 font-outfit font-bold uppercase tracking-wider h-12 transition-all hover:scale-[1.02] active:scale-[0.98]">
-               Edit Details
-             </Button>
-             <Button onClick={handleFinalPublish} disabled={isSubmitting} className="flex-1 font-outfit font-bold uppercase tracking-wider h-12 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-md hover:shadow-lg">
-               {uploadingImages ? 'Uploading Images...' : isSubmitting ? 'Publishing...' : 'Finalize & Publish'}
-             </Button>
+            <Button variant="outline" onClick={() => setViewState('form')} className="flex-1 font-outfit font-bold uppercase tracking-wider h-12 transition-all hover:scale-[1.02] active:scale-[0.98]">
+              Edit Details
+            </Button>
+            <Button onClick={handleFinalPublish} disabled={isSubmitting} className="flex-1 font-outfit font-bold uppercase tracking-wider h-12 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-md hover:shadow-lg">
+              {uploadingImages ? 'Uploading Images...' : isSubmitting ? 'Publishing...' : 'Finalize & Publish'}
+            </Button>
           </div>
         </Card>
       </main>
@@ -411,9 +319,9 @@ function SellPage() {
           </div>
 
           <div className="flex flex-col gap-3">
-            <Button 
-              onClick={downloadQR} 
-              variant="outline" 
+            <Button
+              onClick={downloadQR}
+              variant="outline"
               className="w-full py-6 border-2 border-primary text-primary font-bold font-outfit uppercase tracking-wider transition-all duration-200 hover:bg-primary hover:text-white hover:scale-[1.02] active:scale-[0.98]"
             >
               Download QR Code
@@ -430,7 +338,6 @@ function SellPage() {
     )
   }
 
-  // DEFAULT FORM VIEW
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-10">
       <div className="mx-auto max-w-2xl">
@@ -439,15 +346,12 @@ function SellPage() {
           <p className="text-muted-foreground mt-2">Share your handcrafted artwork and let our AI generate a magical reel for it.</p>
         </div>
 
-        {/* Bio prompt */}
         {!hasBio && user && (
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3 mb-6">
             <User className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
             <div>
               <p className="text-sm font-medium text-amber-800">Complete your profile to build trust with buyers</p>
-              <Link href="/profile" className="text-xs text-amber-600 hover:underline">
-                Add a bio &rarr;
-              </Link>
+              <Link href="/profile" className="text-xs text-amber-600 hover:underline">Add a bio &rarr;</Link>
             </div>
           </div>
         )}
@@ -459,18 +363,17 @@ function SellPage() {
                 <label className="text-sm font-semibold text-foreground">Painting Name <span className="text-red-500">*</span></label>
                 <Input required name="title" placeholder="E.g., Madhubani Village Scene" value={formData.title} onChange={handleChange} />
               </div>
+
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-foreground">Price (₹) <span className="text-red-500">*</span></label>
                 <Input required type="number" min="1" step="1" name="price" placeholder="1200" value={formData.price} onChange={handleChange} />
               </div>
+
               <div className="space-y-4">
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-foreground">Craft Type <span className="text-red-500">*</span></label>
-                  <select 
-                    required 
-                    name="craftType" 
-                    value={formData.craftType} 
-                    onChange={handleChange as any}
+                  <select
+                    required name="craftType" value={formData.craftType} onChange={handleChange}
                     className="flex h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none md:text-sm focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
                   >
                     <option value="" disabled>Select a Craft Type</option>
@@ -487,39 +390,37 @@ function SellPage() {
                   </div>
                 )}
               </div>
+
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-foreground">Region / Origin <span className="text-red-500">*</span></label>
-                <select 
-                  required 
-                  name="region" 
-                  value={formData.region} 
-                  onChange={handleChange as any}
+                <select
+                  required name="region" value={formData.region} onChange={handleChange}
                   className="flex h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none md:text-sm focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
                 >
                   <option value="" disabled>Select State/Region</option>
                   {[
-                    "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat", "Haryana", 
-                    "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur", 
-                    "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", 
+                    "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat", "Haryana",
+                    "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur",
+                    "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu",
                     "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal",
-                    "Andaman and Nicobar Islands", "Chandigarh", "Dadra and Nagar Haveli and Daman and Diu", 
+                    "Andaman and Nicobar Islands", "Chandigarh", "Dadra and Nagar Haveli and Daman and Diu",
                     "Delhi", "Jammu and Kashmir", "Ladakh", "Lakshadweep", "Puducherry"
                   ].sort().map((state) => (
                     <option key={state} value={state}>{state}</option>
                   ))}
                 </select>
               </div>
+
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-foreground">Materials Used</label>
                 <Input name="materials" placeholder="E.g., Natural dyes, handmade paper" value={formData.materials} onChange={handleChange} />
               </div>
-              
+
               <div className="space-y-2 md:col-span-2 relative">
                 <div className="flex justify-between items-end">
                   <label className="text-sm font-semibold text-foreground">Description & Story <span className="text-red-500">*</span></label>
-                  <button 
-                    type="button" 
-                    onClick={toggleRecording}
+                  <button
+                    type="button" onClick={toggleRecording}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors border ${isRecording ? 'border-red-200 bg-red-100 text-red-600 animate-pulse' : 'border-border bg-white text-muted-foreground hover:bg-muted hover:text-foreground'}`}
                   >
                     {isRecording ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
@@ -527,54 +428,30 @@ function SellPage() {
                   </button>
                 </div>
                 <textarea
-                  required
-                  name="description"
-                  placeholder="Describe the artwork, its significance, and the process... (Or click dictation to speak it)"
-                  value={formData.description}
-                  onChange={handleChange}
+                  required name="description"
+                  placeholder="Describe the artwork, its significance, and the process..."
+                  value={formData.description} onChange={handleChange}
                   className="w-full border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 border rounded-md resize-y min-h-[120px]"
                 />
               </div>
 
-                <div className="pt-6 border-t mt-6">
-                  <Button disabled={isSubmitting} type="submit" className="w-full py-6 text-lg shadow-lg font-bold">
-                      {isSubmitting ? (
-                        <span className="flex items-center gap-2">
-                           <Loader2 className="w-5 h-5 animate-spin" /> Publishing...
-                        </span>
-                      ) : 'Publish Product'}
-                  </Button>
-                </div>
-              </form>
-          </Card>
-              {/* Image Upload Area */}
               <div className="space-y-2 md:col-span-2">
                 <label className="text-sm font-semibold text-foreground">Painting Images <span className="text-red-500">*</span></label>
-                
                 <div className="mt-2 flex flex-col items-center justify-center w-full min-h-[120px] px-4 py-8 border-2 border-dashed border-border rounded-xl bg-muted/30 hover:bg-muted/50 transition-colors relative cursor-pointer group">
-                   <UploadCloud className="w-8 h-8 text-muted-foreground mb-3 group-hover:text-primary transition-colors" />
-                   <div className="flex flex-col items-center text-sm text-muted-foreground">
-                      <span className="font-semibold text-foreground">Click to upload</span> or drag and drop
-                      <span className="text-xs mt-1 text-center">SVG, PNG, JPG or GIF (MAX. 800x400px)</span>
-                   </div>
-                   <input 
-                      type="file" 
-                      multiple 
-                      accept="image/*" 
-                      onChange={handleImageUpload}
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
-                   />
+                  <UploadCloud className="w-8 h-8 text-muted-foreground mb-3 group-hover:text-primary transition-colors" />
+                  <div className="flex flex-col items-center text-sm text-muted-foreground">
+                    <span className="font-semibold text-foreground">Click to upload</span> or drag and drop
+                    <span className="text-xs mt-1 text-center">SVG, PNG, JPG or GIF</span>
+                  </div>
+                  <input type="file" multiple accept="image/*" onChange={handleImageUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
                 </div>
-
-                {/* Image Previews */}
                 {formData.images.length > 0 && (
                   <div className="grid grid-cols-3 sm:grid-cols-4 gap-4 pt-4">
                     {formData.images.map((url, idx) => (
                       <div key={idx} className="relative aspect-square rounded-lg overflow-hidden border border-border shadow-sm group">
                         <img src={url} alt={`Preview ${idx}`} className="w-full h-full object-cover" />
                         <button
-                          type="button"
-                          onClick={() => removeImage(idx)}
+                          type="button" onClick={() => removeImage(idx)}
                           className="absolute top-1 right-1 bg-black/60 hover:bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
                         >
                           <X className="w-3.5 h-3.5" />
@@ -585,7 +462,7 @@ function SellPage() {
                 )}
               </div>
             </div>
-            
+
             <div className="pt-6 border-t mt-4 flex justify-end">
               <Button type="submit" className="h-10 px-6 text-sm shadow-sm font-outfit uppercase tracking-wider font-bold transition-all hover:scale-[1.02] active:scale-[0.98] group flex gap-2">
                 <span>Next: Generate AI Reel</span>

@@ -21,7 +21,7 @@ const RATINGS = ['4★ & above', '3★ & above', '2★ & above', '1★ & above']
 export default function FilterSidebar({ categories = [], onFilterChange }: FilterSidebarProps) {
   const [filters, setFilters] = useState<FilterState>({
     categories: [],
-    priceRange: [0, 2000],
+    priceRange: [0, 500000],
     availability: [],
     rating: 0,
   });
@@ -97,15 +97,6 @@ export default function FilterSidebar({ categories = [], onFilterChange }: Filte
           </button>
           {expandedSections.categories && (
             <div className="space-y-2 pl-2">
-              {CATEGORIES.map((cat) => (
-                <label key={cat} className="flex items-center gap-2 text-sm">
-                  <Checkbox
-                    checked={filters.categories.includes(cat)}
-                    onCheckedChange={() => handleCategoryChange(cat)}
-                  />
-                  {cat}
-                </label>
-              ))}
               {categories.length === 0 ? (
                 <p className="text-sm text-gray-400 italic">Loading...</p>
               ) : (
@@ -135,26 +126,24 @@ export default function FilterSidebar({ categories = [], onFilterChange }: Filte
           {expandedSections.price && (
             <div className="space-y-3 pl-2">
               <div>
-                <label className="text-xs text-muted-foreground">Min: ${filters.priceRange[0]}</label>
-                <label className="text-xs text-gray-600">Min: ₹{filters.priceRange[0]}</label>
+                <label className="text-xs text-gray-600">Min: ₹{filters.priceRange[0].toLocaleString()}</label>
                 <input
                   type="range"
                   min="0"
-                  max="2000"
-                  step="50"
+                  max="500000"
+                  step="500"
                   value={filters.priceRange[0]}
                   onChange={(e) => handlePriceChange(e, 0)}
                   className="w-full"
                 />
               </div>
               <div>
-                <label className="text-xs text-muted-foreground">Max: ${filters.priceRange[1]}</label>
-                <label className="text-xs text-gray-600">Max: ₹{filters.priceRange[1]}</label>
+                <label className="text-xs text-gray-600">Max: ₹{filters.priceRange[1].toLocaleString()}</label>
                 <input
                   type="range"
                   min="0"
-                  max="2000"
-                  step="50"
+                  max="500000"
+                  step="500"
                   value={filters.priceRange[1]}
                   onChange={(e) => handlePriceChange(e, 1)}
                   className="w-full"

@@ -52,4 +52,4 @@ temp_outputs/
 generated_media/
 scripts/smoke_test_storytelling.py
 temp/
-tests/
+tests/service_account.json

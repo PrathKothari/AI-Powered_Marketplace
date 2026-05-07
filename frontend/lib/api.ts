@@ -394,10 +394,55 @@ export interface GenerateStoryPayload {
 }
 
 export const generateStoryVideo = async (payload: GenerateStoryPayload): Promise<StoryVideoResponse> => {
+    const token = getAuthToken()
+    if (!token) throw new Error('You must be logged in to generate a story')
     return fetchApi<StoryVideoResponse>('/storytelling/generate', {
         method: 'POST',
         data: payload,
+        token,
     })
+}
+
+// ─── Reel Generation (job-based async pipeline) ───────────────────────────────
+
+export interface ReelGeneratePayload {
+    productId: string
+    imageUrls: string[]
+    description: string
+    productName?: string
+    tone?: string
+    audience?: string
+    stylePreset?: string
+}
+
+export interface ReelJobStatus {
+    jobId: string
+    status: 'pending' | 'scripting' | 'voiceover' | 'video' | 'stitching' | 'uploading' | 'complete' | 'failed'
+    mode?: 'veo' | 'ffmpeg' | null
+    videoUrl?: string | null
+    error?: string | null
+}
+
+export const generateReel = async (payload: ReelGeneratePayload): Promise<ReelJobStatus> => {
+    const token = getAuthToken()
+    if (!token) throw new Error('You must be logged in to generate a reel')
+    return fetchApi<ReelJobStatus>('/storytelling/generate', {
+        method: 'POST',
+        data: payload,
+        token,
+    })
+}
+
+export const getReelStatus = async (jobId: string): Promise<ReelJobStatus> => {
+    const token = getAuthToken()
+    if (!token) throw new Error('You must be logged in')
+    return fetchApi<ReelJobStatus>(`/storytelling/status/${jobId}`, { token })
+}
+
+export const cancelReel = async (jobId: string): Promise<void> => {
+    const token = getAuthToken()
+    if (!token) throw new Error('You must be logged in')
+    await fetchApi<void>(`/storytelling/jobs/${jobId}`, { method: 'DELETE', token })
 }
 
 // ─── Recommendations ──────────────────────────────────────────────────────────
@@ -441,6 +486,7 @@ export const getRecommendations = async (
     payload: RecommendationRequestPayload = {}
 ): Promise<RecommendationItem[]> => {
     try {
+        const token = getAuthToken()
         const body = {
             userId: payload.userId,
             cartItems: payload.cartItems || [],
@@ -451,6 +497,7 @@ export const getRecommendations = async (
         const res = await fetchApi<{ recommendations: RecommendationItem[] }>('/recommendation/', {
             method: 'POST',
             data: body,
+            token: token || undefined,
         })
         return res.recommendations || []
     } catch (err) {

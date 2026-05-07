@@ -45,3 +45,28 @@ class StoryCopyRequest(BaseModel):
     tone: str = "premium"
     audience: str = "online shoppers"
     style_preset: str = "museum_cinematic"
+
+
+class ReelGenerateRequest(BaseModel):
+    productId: str
+    imageUrls: List[str]
+    description: str
+    productName: Optional[str] = None
+    tone: str = "premium"
+    audience: str = "home decor enthusiasts"
+    stylePreset: str = "artisan_story"
+
+    @field_validator("imageUrls")
+    @classmethod
+    def _require_images(cls, v: List[str]) -> List[str]:
+        if not v:
+            raise ValueError("At least one image URL is required")
+        return v
+
+
+class ReelJobResponse(BaseModel):
+    jobId: str
+    status: str
+    mode: Optional[str] = None
+    videoUrl: Optional[str] = None
+    error: Optional[str] = None

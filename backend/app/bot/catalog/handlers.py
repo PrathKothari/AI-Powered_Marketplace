@@ -6,6 +6,7 @@ import logging
 from typing import Any, Dict, List
 
 from firebase_admin import firestore as fa_firestore
+from google.cloud.firestore_v1.base_query import FieldFilter
 from telegram import Update
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
@@ -96,7 +97,7 @@ async def show_categories(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     """Send the inline category browser to the user."""
     db = _db()
     try:
-        docs = db.collection("categories").where("active", "==", True).stream()
+        docs = db.collection("categories").where(filter=FieldFilter("active", "==", True)).stream()
         categories = []
         for doc in docs:
             data = doc.to_dict() or {}
@@ -117,80 +118,145 @@ async def show_categories(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     )
 
 
+async def _safe_reply(query, text: str, parse_mode=None, reply_markup=None) -> None:
+    """Edit the message if it's a text message, otherwise send a new reply."""
+    kwargs = {"text": text}
+    if parse_mode:
+        kwargs["parse_mode"] = parse_mode
+    if reply_markup:
+        kwargs["reply_markup"] = reply_markup
+    try:
+        await query.edit_message_text(**kwargs)
+    except Exception:
+        send_kwargs = {"text": text}
+        if parse_mode:
+            send_kwargs["parse_mode"] = parse_mode
+        if reply_markup:
+            send_kwargs["reply_markup"] = reply_markup
+        await query.message.reply_text(**send_kwargs)
+
+
 async def handle_catalog_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Route all catalog-related inline keyboard callbacks."""
     query = update.callback_query
-    await query.answer()
-
     data: str = query.data or ""
 
     # ── cat:back / cat:cancel ─────────────────────────────────────────────
     if data in ("cat:back", "cat:cancel"):
-        await query.edit_message_text("Use the menu to navigate.")
+        await query.answer()
         return
 
-    # ── cat:{cat_id}:{page} ───────────────────────────────────────────────
+    # ── cat:{craft_type}:{page} ───────────────────────────────────────────
     if data.startswith("cat:"):
+        await query.answer()
         parts = data.split(":")
         if len(parts) != 3:
-            await query.edit_message_text("Use the menu to navigate.")
             return
 
-        cat_id = parts[1]
-        try:
-            page = int(parts[2])
-        except ValueError:
-            page = 0
+        craft_type = parts[1]
+
+        from app.core.config import settings
+        frontend_url = settings.FRONTEND_URL
 
         db = _db()
+        # Query by craftType name (exact match first)
+        all_products: List[Dict[str, Any]] = []
         try:
             docs = (
                 db.collection("products")
-                .where("craftType", "==", cat_id)
-                .where("active", "==", True)
-                .limit(50)
+                .where(filter=FieldFilter("craftType", "==", craft_type))
+                .where(filter=FieldFilter("active", "==", True))
+                .limit(10)
                 .stream()
             )
-            all_products: List[Dict[str, Any]] = []
             for doc in docs:
                 p = doc.to_dict() or {}
                 p["id"] = doc.id
                 all_products.append(p)
         except Exception as exc:
-            logger.error("Firestore products query failed for cat %s: %s", cat_id, exc)
-            all_products = []
+            logger.error("Firestore products query failed for craftType %s: %s", craft_type, exc)
+
+        # Fallback: show top products across all categories
+        if not all_products:
+            try:
+                docs = (
+                    db.collection("products")
+                    .where(filter=FieldFilter("active", "==", True))
+                    .limit(10)
+                    .stream()
+                )
+                for doc in docs:
+                    p = doc.to_dict() or {}
+                    p["id"] = doc.id
+                    all_products.append(p)
+            except Exception as exc:
+                logger.error("Firestore fallback products query failed: %s", exc)
 
         if not all_products:
-            await query.edit_message_text("No products in this category yet.")
+            await _safe_reply(query, "No products available yet. Check back soon!")
             return
 
-        total = len(all_products)
-        start = page * PAGE_SIZE
-        page_products = all_products[start : start + PAGE_SIZE]
+        category_label = craft_type.replace("_", " ").title()
+        header = f"🏺 *{category_label}* — Top {len(all_products)} products"
+        if not any(p.get("craftType") == craft_type for p in all_products):
+            header = f"🏺 *{category_label}*\n\n_No listings yet — here are our top picks:_"
 
-        category_label = cat_id.replace("_", " ").title()
-        text = f"*{category_label}*\nShowing {start + 1}–{min(start + PAGE_SIZE, total)} of {total} products:"
+        await _safe_reply(query, header, parse_mode=ParseMode.MARKDOWN)
 
-        await query.edit_message_text(
-            text,
-            parse_mode=ParseMode.MARKDOWN,
-            reply_markup=products_keyboard(page_products, cat_id, page, total, PAGE_SIZE),
-        )
+        for p in all_products:
+            product_id = p.get("id") or p.get("productId") or ""
+            title = p.get("title") or "Untitled"
+            price = p.get("price", 0)
+            craft = p.get("craftType") or ""
+            region = p.get("region") or ""
+            link = f"{frontend_url}/product/{product_id}"
+
+            caption_parts = [f"*{title}*"]
+            if craft:
+                caption_parts.append(f"🏺 {craft}")
+            if region:
+                caption_parts.append(f"📍 {region}")
+            caption_parts.append(f"💰 ₹{price}")
+            caption_parts.append(f"🔗 [View on KalaSetu]({link})")
+            caption = "\n".join(caption_parts)
+
+            keyboard = product_detail_keyboard(product_id, p.get("artisanId") or "")
+            images: List[str] = p.get("images") or []
+            first_image = images[0] if images and images[0] else None
+
+            try:
+                if first_image:
+                    await query.message.reply_photo(
+                        photo=first_image,
+                        caption=caption,
+                        parse_mode=ParseMode.MARKDOWN,
+                        reply_markup=keyboard,
+                    )
+                else:
+                    await query.message.reply_text(
+                        caption,
+                        parse_mode=ParseMode.MARKDOWN,
+                        reply_markup=keyboard,
+                        disable_web_page_preview=True,
+                    )
+            except Exception as exc:
+                logger.error("Failed to send product card for %s: %s", product_id, exc)
         return
 
     # ── prod:{product_id} ─────────────────────────────────────────────────
     if data.startswith("prod:"):
+        await query.answer()
         product_id = data[len("prod:"):]
         db = _db()
         try:
             doc = db.collection("products").document(product_id).get()
         except Exception as exc:
             logger.error("Firestore product fetch failed for %s: %s", product_id, exc)
-            await query.edit_message_text("Could not load product details. Please try again.")
+            await query.answer("Could not load product details. Please try again.", show_alert=True)
             return
 
         if not doc.exists:
-            await query.edit_message_text("Product not found.")
+            await query.answer("Product not found.", show_alert=True)
             return
 
         p: Dict[str, Any] = doc.to_dict() or {}
@@ -211,24 +277,20 @@ async def handle_catalog_callback(update: Update, context: ContextTypes.DEFAULT_
                     parse_mode=ParseMode.MARKDOWN,
                     reply_markup=keyboard,
                 )
-                await query.edit_message_text("Use the menu to navigate.")
             else:
-                await query.edit_message_text(
+                await query.message.reply_text(
                     caption,
                     parse_mode=ParseMode.MARKDOWN,
                     reply_markup=keyboard,
                 )
         except Exception as exc:
             logger.error("Failed to send product detail for %s: %s", product_id, exc)
-            await query.edit_message_text(
-                caption,
-                parse_mode=ParseMode.MARKDOWN,
-                reply_markup=keyboard,
-            )
+            await query.answer("Could not load product. Please try again.", show_alert=True)
         return
 
     # ── artisan_listings:{uid}:{page} ─────────────────────────────────────
     if data.startswith("artisan_listings:"):
+        await query.answer()
         _, uid, raw_page = data.split(":", 2)
         try:
             page = int(raw_page)
@@ -239,8 +301,8 @@ async def handle_catalog_callback(update: Update, context: ContextTypes.DEFAULT_
         try:
             docs = (
                 db.collection("products")
-                .where("artisanId", "==", uid)
-                .where("active", "==", True)
+                .where(filter=FieldFilter("artisanId", "==", uid))
+                .where(filter=FieldFilter("active", "==", True))
                 .limit(20)
                 .stream()
             )
@@ -254,7 +316,7 @@ async def handle_catalog_callback(update: Update, context: ContextTypes.DEFAULT_
             all_products = []
 
         if not all_products:
-            await query.edit_message_text("This artisan has no active listings.")
+            await _safe_reply(query, "This artisan has no active listings.")
             return
 
         total = len(all_products)
@@ -263,7 +325,8 @@ async def handle_catalog_callback(update: Update, context: ContextTypes.DEFAULT_
 
         text = f"*Artisan's Listings*\nShowing {start + 1}–{min(start + PAGE_SIZE, total)} of {total} products:"
 
-        await query.edit_message_text(
+        await _safe_reply(
+            query,
             text,
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=products_keyboard(page_products, f"_artisan_{uid}", page, total, PAGE_SIZE),
@@ -272,23 +335,25 @@ async def handle_catalog_callback(update: Update, context: ContextTypes.DEFAULT_
 
     # ── artisan:{uid} ─────────────────────────────────────────────────────
     if data.startswith("artisan:"):
+        await query.answer()
         uid = data[len("artisan:"):]
         db = _db()
         try:
             doc = db.collection("users").document(uid).get()
         except Exception as exc:
             logger.error("Firestore artisan fetch failed for %s: %s", uid, exc)
-            await query.edit_message_text("Could not load artisan profile. Please try again.")
+            await query.answer("Could not load artisan profile.", show_alert=True)
             return
 
         if not doc.exists:
-            await query.edit_message_text("Artisan profile not found.")
+            await query.answer("Artisan profile not found.", show_alert=True)
             return
 
         u: Dict[str, Any] = doc.to_dict() or {}
         text = _format_artisan(u)
 
-        await query.edit_message_text(
+        await _safe_reply(
+            query,
             text,
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=artisan_keyboard(uid),
@@ -296,6 +361,7 @@ async def handle_catalog_callback(update: Update, context: ContextTypes.DEFAULT_
         return
 
     # Unrecognised callback — silently ignore
+    await query.answer()
     logger.warning("handle_catalog_callback: unrecognised callback data %r", data)
 
 
@@ -312,8 +378,7 @@ async def show_recommendations(update: Update, context: ContextTypes.DEFAULT_TYP
     try:
         order_docs = (
             db.collection("orders")
-            .where("userId", "==", uid)
-            .order_by("createdAt", direction=fa_firestore.Query.DESCENDING)
+            .where(filter=FieldFilter("userId", "==", uid))
             .limit(10)
             .stream()
         )
@@ -337,8 +402,7 @@ async def show_recommendations(update: Update, context: ContextTypes.DEFAULT_TYP
         try:
             top_docs = (
                 db.collection("products")
-                .where("active", "==", True)
-                .order_by("rating", direction=fa_firestore.Query.DESCENDING)
+                .where(filter=FieldFilter("active", "==", True))
                 .limit(5)
                 .stream()
             )

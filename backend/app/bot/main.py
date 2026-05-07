@@ -32,7 +32,13 @@ from app.bot.live.handlers import handle_live_callback, post_live_chat
 from app.bot.notifications.dispatcher import register_notification_jobs
 from app.bot.orders.handlers import build_checkout_conversation_handler, handle_order_callbacks
 from app.bot.payments.handlers import handle_pay_callback
-from app.bot.sell.conversation import build_sell_conversation_handler
+from app.bot.sell.conversation import (
+    build_sell_conversation_handler,
+    handle_reel_callback,
+    handle_skip_reel_callback,
+    handle_sell_listing_callbacks,
+    show_my_listings,
+)
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -51,7 +57,7 @@ def _build_app():
         .build()
     )
 
-    conversation_timeout = 600 if getattr(app, "_job_queue", None) is not None else None
+    conversation_timeout = None
 
     # ── Group 0: Auth ConversationHandler (highest priority) ──────────────
     app.add_handler(build_auth_conversation_handler(conversation_timeout=conversation_timeout), group=0)
@@ -71,11 +77,11 @@ def _build_app():
         group=3,
     )
 
-    # ── Group 4: Cart callbacks (cart_add:, cart_remove:, cart_clear, cart_detail:) ──
+    # ── Group 4: Cart callbacks ───────────────────────────────────────────
     app.add_handler(
         CallbackQueryHandler(
             handle_cart_callback,
-            pattern=r"^(cart_add:|cart_remove:|cart_clear|cart_detail:)",
+            pattern=r"^(cart_add:|cart_remove:|cart_clear|cart_detail:|show_cart)",
         ),
         group=4,
     )
@@ -98,22 +104,37 @@ def _build_app():
         group=7,
     )
 
-    # ── Group 8: Recommendations shortcut ────────────────────────────────
-    app.add_handler(CommandHandler("recommendations", show_recommendations), group=8)
+    # ── Group 8: Sell / reel callbacks ────────────────────────────────────
+    app.add_handler(CallbackQueryHandler(handle_reel_callback, pattern=r"^sell_reel:"), group=8)
+    app.add_handler(CallbackQueryHandler(handle_skip_reel_callback, pattern=r"^sell_skip_reel:"), group=8)
+    app.add_handler(
+        CallbackQueryHandler(
+            handle_sell_listing_callbacks,
+            pattern=r"^(sell_toggle:|sell_delete:|sell_my_listings:)",
+        ),
+        group=8,
+    )
 
-    # ── Group 9: Image & text message handlers ────────────────────────────
+    # ── Group 9: Recommendations shortcut ────────────────────────────────
+    app.add_handler(CommandHandler("recommendations", show_recommendations), group=9)
+
+    # ── Group 10: Image & text message handlers ───────────────────────────
     # Live chat intercept: if user is in a live:chat session, post to Firestore
     app.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, post_live_chat),
-        group=9,
+        group=10,
     )
-    app.add_handler(MessageHandler(filters.PHOTO, handle_image_message), group=9)
+    app.add_handler(MessageHandler(filters.PHOTO, handle_image_message), group=10)
     # General text (menu taps + AI chat/search) — lower priority than live chat
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_message), group=10)
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_message), group=11)
 
     # ── Notification jobs ─────────────────────────────────────────────────
-    if app.job_queue is not None:
-        register_notification_jobs(app.job_queue)
+    try:
+        jq = app.job_queue
+        if jq is not None:
+            register_notification_jobs(jq)
+    except Exception:
+        logger.info("JobQueue not available — notification scheduling disabled.")
 
     return app
 

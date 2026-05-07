@@ -6,12 +6,20 @@ from urllib.parse import urlparse
 from typing import List, Optional
 
 import httpx
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.concurrency import run_in_threadpool
 
+from app.core.deps import get_current_user
 from app.core.config import settings
-from app.ml.pipelines.video_generator import generate_story_video
-from app.schemas.storytelling import StoryCreative, StoryVideoRequest, StoryVideoResponse
+from app.ml.pipelines.video_generator import generate_story_video, run_reel_pipeline
+from app.schemas.storytelling import (
+    ReelGenerateRequest,
+    ReelJobResponse,
+    StoryCreative,
+    StoryVideoRequest,
+    StoryVideoResponse,
+)
+from app.services.storytelling import job_service
 from app.services.storytelling.ai_copy import STYLE_PRESETS, generate_ad_copy
 
 router = APIRouter()
@@ -116,19 +124,40 @@ async def generate_video(
     )
 
 
-@router.post("/generate", response_model=StoryVideoResponse)
-async def generate_story_pipeline(payload: StoryVideoRequest):
-    image_paths = [await _materialize_image_source(source) for source in payload.image_urls]
+@router.post("/generate", response_model=ReelJobResponse)
+async def generate_reel(
+    payload: ReelGenerateRequest,
+    background_tasks: BackgroundTasks,
+    current_user: dict = Depends(get_current_user),
+):
+    """Start an async reel generation job for a product.
 
-    return await _generate_story_response(
-        image_paths,
-        payload.description,
-        product_name=payload.product_name,
-        tone=payload.tone,
-        audience=payload.audience,
-        style_preset=payload.style_preset,
-        duration_per_image=payload.duration_per_image,
+    Returns the existing job_id immediately if a non-terminal job is already
+    active for this product (prevents duplicate submissions).
+    """
+    seller_id: str = current_user["sub"]
+
+    existing_job_id = await run_in_threadpool(
+        job_service.get_active_job_for_product, payload.productId
     )
+    if existing_job_id:
+        job = await run_in_threadpool(job_service.get_job, existing_job_id)
+        return ReelJobResponse(
+            jobId=existing_job_id,
+            status=job.get("status", "pending") if job else "pending",
+            mode=job.get("mode") if job else None,
+        )
+
+    job_id = await run_in_threadpool(
+        job_service.create_job,
+        payload.productId,
+        seller_id,
+        payload.imageUrls,
+    )
+
+    background_tasks.add_task(run_reel_pipeline, job_id)
+
+    return ReelJobResponse(jobId=job_id, status="pending")
 
 
 @router.post("/generate-copy", response_model=StoryCreative)
@@ -154,6 +183,56 @@ async def generate_copy(
     )
 
     return StoryCreative(**creative)
+
+
+@router.get("/status/{job_id}", response_model=ReelJobResponse)
+async def get_reel_status(
+    job_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Return the current status of a reel generation job."""
+    job = await run_in_threadpool(job_service.get_job, job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    seller_id: str = current_user["sub"]
+    if job.get("sellerId") != seller_id:
+        raise HTTPException(status_code=403, detail="Not authorised to view this job")
+
+    return ReelJobResponse(
+        jobId=job.get("jobId", job_id),
+        status=job.get("status", "unknown"),
+        mode=job.get("mode"),
+        videoUrl=job.get("videoUrl"),
+        error=job.get("error"),
+    )
+
+
+@router.delete("/jobs/{job_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def cancel_reel_job(
+    job_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Cancel a pending reel generation job.
+
+    Only pending jobs can be cancelled; in-progress jobs are left to finish.
+    """
+    job = await run_in_threadpool(job_service.get_job, job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    seller_id: str = current_user["sub"]
+    if job.get("sellerId") != seller_id:
+        raise HTTPException(status_code=403, detail="Not authorised to cancel this job")
+
+    current_status = job.get("status", "")
+    if current_status not in {"pending"}:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Cannot cancel a job with status '{current_status}'",
+        )
+
+    await run_in_threadpool(job_service.update_job, job_id, status="failed", error="Cancelled by seller")
 
 
 @router.get("/styles")

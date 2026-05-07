@@ -187,10 +187,6 @@
     animation: fadeInUp 0.9s ease forwards;
     opacity: 0;
   }
-  .fade-in {
-    animation: fadeIn 0.75s ease forwards;
-    opacity: 0;
-  }
   @keyframes fadeInUp {
     from {
       opacity: 0;

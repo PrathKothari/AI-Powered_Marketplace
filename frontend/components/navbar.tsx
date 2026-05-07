@@ -3,36 +3,27 @@
 import Link from 'next/link'
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { usePathname } from 'next/navigation'
-import { ShoppingCart, User as UserIcon, Search, Menu, X, Globe } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { ShoppingCart, Search, Globe, Loader2, LogOut, ChevronDown, LayoutDashboard, Plus, Package, UserCircle } from 'lucide-react'
 import { useCart } from '@/context/CartContext'
 import { useTranslation } from '@/lib/i18n'
-import { getUser, User } from '@/lib/auth'
 import { getProducts } from '@/lib/products'
 import { Product } from '@/lib/types/product'
 import { useDebounce } from '@/lib/hooks/use-debounce'
-import { useRouter } from 'next/navigation'
-import { Loader2 } from 'lucide-react'
+import { useAuth } from '@/context/AuthContext'
+import { getUserProfile } from '@/lib/api'
+import { toast } from 'sonner'
 
 const NAV_LINKS = [
   { href: '/', label: 'Home' },
   { href: '/marketplace', label: 'Marketplace', i18nKey: 'marketplace' },
   { href: '/reels', label: 'Reels' },
-  { href: '/discover', label: 'Discover' },
-  { href: '/origin', label: 'Origin' },
+  { href: '/origin', label: 'Discover' },
 ]
-import { ShoppingCart, User, Menu, Paintbrush, LogOut, ChevronDown, LayoutDashboard, Plus, Package, UserCircle, Radio } from 'lucide-react'
-import { useState, useRef, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { useCart } from '@/context/CartContext'
-import { useTranslation } from '@/lib/i18n'
-import { useAuth } from '@/context/AuthContext'
-import { getUserProfile } from '@/lib/api'
-import { toast } from 'sonner'
 
 export default function Navbar() {
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [currentUser, setCurrentUser] = useState<User | null>(null)
   const [scrolled, setScrolled] = useState(false)
   const [searchFocused, setSearchFocused] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -40,57 +31,47 @@ export default function Navbar() {
   const [isSearching, setIsSearching] = useState(false)
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [recentSearches] = useState(['Ceramic', 'Ring', 'Handwoven'])
-  
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null)
+
   const debouncedSearch = useDebounce(searchQuery, 300)
   const router = useRouter()
   const { totalItems } = useCart()
   const { t, lang, setLang } = useTranslation()
+  const { user, logout } = useAuth()
   const mobileMenuRef = useRef<HTMLDivElement>(null)
   const searchContainerRef = useRef<HTMLDivElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
 
-  // Handle Search logic
   useEffect(() => {
     if (debouncedSearch.length < 2) {
       setSuggestions([])
       setIsSearching(false)
       return
     }
-
     setIsSearching(true)
-    // Simulate API delay
     const timer = setTimeout(() => {
       const products = getProducts()
-      const filtered = products.filter(p => 
+      const filtered = products.filter(p =>
         p.name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
         p.category?.toLowerCase().includes(debouncedSearch.toLowerCase())
       ).slice(0, 5)
       setSuggestions(filtered)
       setIsSearching(false)
     }, 400)
-
     return () => clearTimeout(timer)
   }, [debouncedSearch])
 
-  // Close suggestions on outside click
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
       if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
         setShowSuggestions(false)
-  const [userMenuOpen, setUserMenuOpen] = useState(false)
-  const [photoUrl, setPhotoUrl] = useState<string | null>(null)
-  const { totalItems } = useCart()
-  const { t, lang, setLang } = useTranslation()
-  const { user, logout } = useAuth()
-  const router = useRouter()
-  const menuRef = useRef<HTMLDivElement>(null)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
 
-  // Fetch profile photo
-  useEffect(() => {
-    if (!user) { setPhotoUrl(null); return }
-    getUserProfile(user.uid).then(p => setPhotoUrl(p?.photoUrl || null)).catch(() => {})
-  }, [user])
-
-  // Close user dropdown on outside click
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
@@ -102,11 +83,10 @@ export default function Navbar() {
   }, [])
 
   useEffect(() => {
-    if (typeof window === 'undefined') return
-    setCurrentUser(getUser())
-  }, [])
+    if (!user) { setPhotoUrl(null); return }
+    getUserProfile(user.uid).then(p => setPhotoUrl(p?.photoUrl || null)).catch(() => {})
+  }, [user])
 
-  // Scroll-aware shadow & backdrop
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8)
     window.addEventListener('scroll', onScroll, { passive: true })
@@ -114,12 +94,10 @@ export default function Navbar() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
-  // Close mobile menu on route change
   useEffect(() => {
     setMobileMenuOpen(false)
   }, [pathname])
 
-  // Close mobile menu on Escape key
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setMobileMenuOpen(false)
@@ -128,14 +106,10 @@ export default function Navbar() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  // Lock body scroll when mobile menu is open
   useEffect(() => {
     document.body.style.overflow = mobileMenuOpen ? 'hidden' : ''
     return () => { document.body.style.overflow = '' }
   }, [mobileMenuOpen])
-
-  const profileHref = currentUser ? '/dashboard' : '/login'
-  const profileLabel = currentUser ? 'Dashboard' : 'Login'
 
   const isActive = useCallback((href: string) => {
     if (href === '/') return pathname === '/'
@@ -147,9 +121,9 @@ export default function Navbar() {
     const parts = text.split(new RegExp(`(${query})`, 'gi'))
     return (
       <>
-        {parts.map((part, i) => 
-          part.toLowerCase() === query.toLowerCase() 
-            ? <span key={i} className="search-highlight">{part}</span> 
+        {parts.map((part, i) =>
+          part.toLowerCase() === query.toLowerCase()
+            ? <span key={i} className="search-highlight">{part}</span>
             : part
         )}
       </>
@@ -160,6 +134,8 @@ export default function Navbar() {
     setSearchQuery('')
     setShowSuggestions(false)
     router.push(`/product/${product.id}`)
+  }
+
   const handleLogout = async () => {
     await logout()
     toast.success('Signed out successfully')
@@ -169,7 +145,6 @@ export default function Navbar() {
 
   return (
     <>
-      {/* Spacer for fixed navbar */}
       <div className="navbar-spacer" />
       <nav
         className={`navbar-root ${scrolled ? 'navbar-scrolled' : ''}`}
@@ -199,7 +174,10 @@ export default function Navbar() {
           {/* Search Bar */}
           <div className="navbar-search-wrapper" ref={searchContainerRef}>
             <div className={`navbar-search ${searchFocused ? 'navbar-search-focused' : ''}`}>
-              {isSearching ? <Loader2 className="navbar-search-icon animate-spin" /> : <Search className="navbar-search-icon" />}
+              {isSearching
+                ? <Loader2 className="navbar-search-icon animate-spin" />
+                : <Search className="navbar-search-icon" />
+              }
               <input
                 type="text"
                 placeholder="Search products..."
@@ -217,7 +195,6 @@ export default function Navbar() {
               />
             </div>
 
-            {/* Suggestions Dropdown */}
             {showSuggestions && (searchQuery.length > 0 || searchFocused) && (
               <div className="search-dropdown">
                 {searchQuery.length > 0 ? (
@@ -230,15 +207,15 @@ export default function Navbar() {
                       <>
                         <div className="px-4 py-2 text-[10px] uppercase font-bold text-muted-foreground tracking-widest bg-muted/30">Products</div>
                         {suggestions.map((p) => (
-                          <div 
-                            key={p.id} 
+                          <div
+                            key={p.id}
                             className="search-suggestion-item"
                             onMouseDown={() => handleSuggestionClick(p)}
                           >
                             <img src={p.images?.[0]} className="w-10 h-10 rounded-lg object-cover" alt="" />
                             <div className="flex-1 truncate">
                               <div className="text-sm font-semibold truncate">{highlightText(p.name, searchQuery)}</div>
-                              <div className="text-xs text-muted-foreground">${p.price}</div>
+                              <div className="text-xs text-muted-foreground">₹{p.price}</div>
                             </div>
                           </div>
                         ))}
@@ -246,7 +223,7 @@ export default function Navbar() {
                     ) : (
                       <div className="search-no-results">
                         <div className="text-2xl">✨</div>
-                        <div className="text-sm font-semibold">No treasures found for "{searchQuery}"</div>
+                        <div className="text-sm font-semibold">No treasures found for &quot;{searchQuery}&quot;</div>
                         <div className="text-xs text-muted-foreground">Try searching for ceramics, rings, or baskets instead.</div>
                       </div>
                     )}
@@ -255,8 +232,8 @@ export default function Navbar() {
                   <div className="py-2">
                     <div className="px-4 py-2 text-[10px] uppercase font-bold text-muted-foreground tracking-widest bg-muted/30">Trending Searches</div>
                     {recentSearches.map((s) => (
-                      <div 
-                        key={s} 
+                      <div
+                        key={s}
                         className="px-4 py-2.5 text-sm hover:bg-accent cursor-pointer flex items-center gap-3 transition-colors"
                         onMouseDown={() => setSearchQuery(s)}
                       >
@@ -269,35 +246,9 @@ export default function Navbar() {
               </div>
             )}
           </div>
-          <Link href="/" className="flex items-center gap-2">
-            <Paintbrush className="w-6 h-6 text-primary" />
-            <h1 className="text-2xl font-bold text-primary">KalaSetu</h1>
-          </Link>
-
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center gap-8">
-            <Link href="/" className="text-sm font-outfit font-bold uppercase tracking-wider hover:text-primary transition-colors">
-              Home
-            </Link>
-            <Link href="/marketplace" className="text-sm font-outfit font-bold uppercase tracking-wider hover:text-primary transition-colors">
-              {t("marketplace")}
-            </Link>
-            <Link href="/reels" className="text-sm font-outfit font-bold uppercase tracking-wider hover:text-primary transition-colors">
-              Reels
-            </Link>
-            <Link href="/live" className="text-sm font-outfit font-bold uppercase tracking-wider hover:text-primary transition-colors">
-              Live
-            </Link>
-            <Link href="/origin" className="text-sm font-outfit font-bold uppercase tracking-wider hover:text-primary transition-colors">
-              Origin
-            </Link>
-          </div>
-
-
 
           {/* Desktop Actions */}
           <div className="navbar-actions">
-            {/* Language Selector */}
             <button
               className="navbar-action-btn navbar-lang-btn"
               onClick={() => setLang(lang === 'en' ? 'hi' : 'en')}
@@ -308,7 +259,6 @@ export default function Navbar() {
               <span className="navbar-lang-label">{lang === 'en' ? 'EN' : 'हि'}</span>
             </button>
 
-            {/* Cart */}
             <Link href="/buyer/cart" className="navbar-action-btn" id="cart-icon" aria-label={`Cart with ${totalItems} items`}>
               <ShoppingCart className="w-[18px] h-[18px]" />
               {totalItems > 0 && (
@@ -318,15 +268,6 @@ export default function Navbar() {
               )}
             </Link>
 
-            {/* Profile */}
-            <Link
-              href={profileHref}
-              className="navbar-action-btn"
-              title={profileLabel}
-              aria-label={profileLabel}
-            >
-              <UserIcon className="w-[18px] h-[18px]" />
-            </Link>
             {user ? (
               <div className="relative" ref={menuRef}>
                 <button
@@ -373,8 +314,8 @@ export default function Navbar() {
                 )}
               </div>
             ) : (
-              <Link href="/login" className="p-2 hover:bg-secondary rounded-lg transition-colors">
-                <User className="w-5 h-5" />
+              <Link href="/login" className="navbar-action-btn" aria-label="Sign in">
+                <UserCircle className="w-[18px] h-[18px]" />
               </Link>
             )}
           </div>
@@ -421,9 +362,12 @@ export default function Navbar() {
         aria-label="Mobile navigation"
       >
         {/* Mobile Search */}
-        <div className="navbar-mobile-search-wrapper" ref={searchContainerRef}>
+        <div className="navbar-mobile-search-wrapper">
           <div className="navbar-search navbar-mobile-search">
-            {isSearching ? <Loader2 className="navbar-search-icon animate-spin" /> : <Search className="navbar-search-icon" />}
+            {isSearching
+              ? <Loader2 className="navbar-search-icon animate-spin" />
+              : <Search className="navbar-search-icon" />
+            }
             <input
               type="text"
               placeholder="Search products..."
@@ -436,57 +380,40 @@ export default function Navbar() {
               onFocus={() => setShowSuggestions(true)}
             />
           </div>
-          
-          {/* Mobile Search Suggestions Dropdown */}
-          {showSuggestions && (searchQuery.length > 0 || searchFocused) && (
+
+          {showSuggestions && searchQuery.length > 0 && (
             <div className="search-dropdown static mt-2 max-h-[60vh] overflow-y-auto">
-              {searchQuery.length > 0 ? (
-                <div className="py-2">
-                  {isSearching ? (
-                    <div className="p-4 text-center text-muted-foreground text-sm flex items-center justify-center gap-2">
-                      <Loader2 className="w-4 h-4 animate-spin" /> Finding treasures...
-                    </div>
-                  ) : suggestions.length > 0 ? (
-                    <>
-                      <div className="px-4 py-2 text-[10px] uppercase font-bold text-muted-foreground tracking-widest bg-muted/30">Products</div>
-                      {suggestions.map((p) => (
-                        <div 
-                          key={p.id} 
-                          className="search-suggestion-item"
-                          onMouseDown={() => {
-                            handleSuggestionClick(p)
-                            setMobileMenuOpen(false)
-                          }}
-                        >
-                          <img src={p.images?.[0]} className="w-10 h-10 rounded-lg object-cover" alt="" />
-                          <div className="flex-1 truncate">
-                            <div className="text-sm font-semibold truncate">{highlightText(p.name, searchQuery)}</div>
-                            <div className="text-xs text-muted-foreground">${p.price}</div>
-                          </div>
+              <div className="py-2">
+                {isSearching ? (
+                  <div className="p-4 text-center text-muted-foreground text-sm flex items-center justify-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" /> Finding treasures...
+                  </div>
+                ) : suggestions.length > 0 ? (
+                  <>
+                    <div className="px-4 py-2 text-[10px] uppercase font-bold text-muted-foreground tracking-widest bg-muted/30">Products</div>
+                    {suggestions.map((p) => (
+                      <div
+                        key={p.id}
+                        className="search-suggestion-item"
+                        onMouseDown={() => {
+                          handleSuggestionClick(p)
+                          setMobileMenuOpen(false)
+                        }}
+                      >
+                        <img src={p.images?.[0]} className="w-10 h-10 rounded-lg object-cover" alt="" />
+                        <div className="flex-1 truncate">
+                          <div className="text-sm font-semibold truncate">{highlightText(p.name, searchQuery)}</div>
+                          <div className="text-xs text-muted-foreground">₹{p.price}</div>
                         </div>
-                      ))}
-                    </>
-                  ) : (
-                    <div className="search-no-results">
-                      <div className="text-sm font-semibold">No treasures found for "{searchQuery}"</div>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="py-2">
-                  <div className="px-4 py-2 text-[10px] uppercase font-bold text-muted-foreground tracking-widest bg-muted/30">Trending Searches</div>
-                  {recentSearches.map((s) => (
-                    <div 
-                      key={s} 
-                      className="px-4 py-2.5 text-sm hover:bg-accent cursor-pointer flex items-center gap-3 transition-colors"
-                      onMouseDown={() => setSearchQuery(s)}
-                    >
-                      <Search className="w-3.5 h-3.5 text-muted-foreground" />
-                      {s}
-                    </div>
-                  ))}
-                </div>
-              )}
+                      </div>
+                    ))}
+                  </>
+                ) : (
+                  <div className="search-no-results">
+                    <div className="text-sm font-semibold">No treasures found for &quot;{searchQuery}&quot;</div>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -516,58 +443,22 @@ export default function Navbar() {
             <Globe className="w-5 h-5" />
             <span>{lang === 'en' ? 'English' : 'हिंदी'}</span>
           </button>
-          <Link
-            href={profileHref}
-            className="navbar-mobile-footer-btn navbar-mobile-profile-btn"
-            onClick={() => setMobileMenuOpen(false)}
-          >
-            <UserIcon className="w-5 h-5" />
-            <span>{profileLabel}</span>
-          </Link>
+          {user ? (
+            <button onClick={handleLogout} className="navbar-mobile-footer-btn">
+              <LogOut className="w-5 h-5" />
+              <span>Sign Out</span>
+            </button>
+          ) : (
+            <Link
+              href="/login"
+              className="navbar-mobile-footer-btn navbar-mobile-profile-btn"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              <UserCircle className="w-5 h-5" />
+              <span>Sign In</span>
+            </Link>
+          )}
         </div>
-        {/* Mobile Menu */}
-        {mobileMenuOpen && (
-          <div className="md:hidden pb-4 space-y-3">
-
-            <Link href="/" className="block text-sm font-medium hover:text-primary transition-colors py-2">
-              Home
-            </Link>
-            <Link href="/marketplace" className="block text-sm font-medium hover:text-primary transition-colors py-2">
-              {t("marketplace")}
-            </Link>
-            <Link href="/reels" className="block text-sm font-medium hover:text-primary transition-colors py-2">
-              Reels
-            </Link>
-            <Link href="/live" className="block text-sm font-medium hover:text-primary transition-colors py-2">
-              Live
-            </Link>
-            <Link href="/origin" className="block text-sm font-medium hover:text-primary transition-colors py-2">
-              Origin
-            </Link>
-            <div className="py-2">
-              <select
-                value={lang}
-                onChange={(e) => setLang(e.target.value)}
-                className="w-full bg-secondary border border-border rounded px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-              >
-                <option value="en">English</option>
-                <option value="hi">हिंदी</option>
-              </select>
-            </div>
-            {user ? (
-              <button
-                onClick={handleLogout}
-                className="flex items-center gap-2 text-sm font-medium text-destructive hover:text-destructive/80 transition-colors py-2"
-              >
-                <LogOut className="w-4 h-4" /> Sign Out ({user.name})
-              </button>
-            ) : (
-              <Link href="/login" className="flex items-center gap-2 text-sm font-medium hover:text-primary transition-colors py-2">
-                <User className="w-4 h-4" /> Sign In / Register
-              </Link>
-            )}
-          </div>
-        )}
       </div>
     </>
   )

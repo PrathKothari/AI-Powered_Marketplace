@@ -13,9 +13,6 @@ export interface User {
   email: string;
   role: 'buyer' | 'artisan' | 'both';
   favorites?: string[];
-  name: string
-  email: string
-  role: string
 }
 
 interface AuthResponse {
@@ -118,12 +115,11 @@ export function clearSession(): void {
 export function getStoredUser(): AuthUser | null {
   if (typeof window === "undefined") return null
   try {
-    const userStr = localStorage.getItem('user')
-    return userStr ? JSON.parse(userStr) : null
-  } catch (error) {
-    console.error('Failed to parse user from localStorage', error)
     const raw = localStorage.getItem("auth_user")
-    return raw ? (JSON.parse(raw) as AuthUser) : null
+    if (raw) return JSON.parse(raw) as AuthUser
+    // Legacy fallback for old sessions stored under 'user'
+    const legacy = localStorage.getItem('user')
+    return legacy ? (JSON.parse(legacy) as AuthUser) : null
   } catch {
     return null
   }

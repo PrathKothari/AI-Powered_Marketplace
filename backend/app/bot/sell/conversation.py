@@ -24,7 +24,7 @@ from telegram.ext import (
 )
 
 from app.bot.auth.middleware import AUTH_SESSION_CACHE_KEY, get_telegram_user_id, mark_update_consumed, require_auth
-from app.bot.sell.reel import STYLE_LABELS, generate_reel_for_product
+from app.bot.sell.reel import generate_reel_for_product
 
 logger = logging.getLogger(__name__)
 
@@ -78,13 +78,6 @@ def _reel_prompt_keyboard(product_id: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("🎬 Generate Reel", callback_data=f"sell_reel:{product_id}")],
         [InlineKeyboardButton("Skip for now", callback_data=f"sell_skip_reel:{product_id}")],
-    ])
-
-
-def _style_keyboard(product_id: str) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton(label, callback_data=f"sell_style:{style}:{product_id}")]
-        for style, label in STYLE_LABELS.items()
     ])
 
 
@@ -218,6 +211,7 @@ async def handle_region_callback(update: Update, context: ContextTypes.DEFAULT_T
 
 async def handle_photos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     mark_update_consumed(update, context)
+    import io
     session = context.user_data.get(AUTH_SESSION_CACHE_KEY, {})
     uid = session.get("uid", "unknown")
     photos: List[str] = context.user_data.get(_K_PHOTOS, [])
@@ -229,9 +223,14 @@ async def handle_photos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     photo = update.message.photo[-1]  # highest resolution
     tg_file = await context.bot.get_file(photo.file_id)
 
-    # Use Telegram CDN URL directly (avoids Firebase Storage IAM/ACL requirements).
-    # file_path in PTB v21 is the full HTTPS URL on api.telegram.org.
-    url = tg_file.file_path
+    photo_bytes_io = io.BytesIO()
+    await tg_file.download_to_memory(photo_bytes_io)
+    photo_bytes = photo_bytes_io.getvalue()
+
+    url = await _upload_photo_to_storage(photo_bytes, uid)
+    if not url:
+        await update.message.reply_text("⚠️ Photo upload failed. Please try again.")
+        return PHOTOS
 
     photos.append(url)
     context.user_data[_K_PHOTOS] = photos
@@ -275,8 +274,10 @@ async def handle_confirm_callback(update: Update, context: ContextTypes.DEFAULT_
     await query.answer()
 
     if (query.data or "") == "sell_cancel":
+        from app.bot.menu import main_menu_keyboard
         _clear_sell_data(context)
         await query.edit_message_text("Listing cancelled.")
+        await query.message.reply_text("What would you like to do next?", reply_markup=main_menu_keyboard())
         return ConversationHandler.END
 
     # Create product in Firestore
@@ -305,6 +306,7 @@ async def handle_confirm_callback(update: Update, context: ContextTypes.DEFAULT_
     try:
         _, ref = _db().collection("products").add(product)
         product_id = ref.id
+        ref.update({"productId": product_id})
     except Exception as exc:
         logger.error("Failed to create product: %s", exc)
         await query.edit_message_text("Something went wrong. Please try again.")
@@ -323,33 +325,23 @@ async def handle_confirm_callback(update: Update, context: ContextTypes.DEFAULT_
 # ── Reel callbacks (registered globally, not inside the ConversationHandler) ──
 
 async def handle_reel_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    from app.bot.menu import main_menu_keyboard
     query = update.callback_query
     await query.answer()
     product_id = (query.data or "").split(":", 1)[1]
-    await query.edit_message_text(
-        "Choose a style for your reel:",
-        reply_markup=_style_keyboard(product_id),
-    )
-
-
-async def handle_style_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    query = update.callback_query
-    await query.answer()
-    parts = (query.data or "").split(":")
-    style = parts[1] if len(parts) > 1 else "museum_cinematic"
-    product_id = parts[2] if len(parts) > 2 else ""
 
     doc = _db().collection("products").document(product_id).get()
     if not doc.exists:
-        await query.edit_message_text("Product not found.")
+        await query.edit_message_text("❌ Product not found.")
+        await query.message.reply_text("What would you like to do next?", reply_markup=main_menu_keyboard())
         return
 
     product = {"id": product_id, **(doc.to_dict() or {})}
-    await query.edit_message_text("⏳ Generating your reel…")
+    await query.edit_message_text("⏳ Generating your reel… this takes about 30 seconds 🎬")
 
     video_url = await generate_reel_for_product(
         product=product,
-        style=style,
+        style="museum_cinematic",
         bot=context.bot,
         chat_id=update.effective_chat.id,
     )
@@ -360,11 +352,17 @@ async def handle_style_callback(update: Update, context: ContextTypes.DEFAULT_TY
         except Exception as exc:
             logger.warning("Failed to save storyVideo for %s: %s", product_id, exc)
 
+    await query.message.reply_text("What would you like to do next?", reply_markup=main_menu_keyboard())
+
 
 async def handle_skip_reel_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    from app.bot.menu import main_menu_keyboard
     query = update.callback_query
     await query.answer()
-    await query.edit_message_text("No worries! You can generate a reel any time from your listings. 🙂")
+    await query.edit_message_text(
+        "No worries! Your listing is live on KalaSetu. 🎨\n\nYou can generate a reel anytime from your listings."
+    )
+    await query.message.reply_text("What would you like to do next?", reply_markup=main_menu_keyboard())
 
 
 # ── My listings ────────────────────────────────────────────────────────────────

@@ -32,7 +32,7 @@ export default function SellerCta() {
               asChild
               variant="outline"
               size="lg"
-              className="bg-white hover:bg-white/95 text-primary rounded-lg font-outfit font-bold uppercase tracking-wider text-sm transition-all hover:scale-105 active:scale-95 shadow-xl border-none px-8"
+              className="bg-transparent border-2 border-white text-white hover:bg-white hover:text-primary rounded-lg font-outfit font-bold uppercase tracking-wider text-sm transition-all hover:scale-105 active:scale-95 px-8"
             >
               <Link href="/marketplace">Learn More</Link>
             </Button>

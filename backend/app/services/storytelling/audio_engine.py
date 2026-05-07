@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import subprocess
 import uuid
 from pathlib import Path
 
@@ -20,6 +21,23 @@ def _get_tts_client():
     except Exception as e:
         logger.warning("Google TTS client unavailable: %s", e)
         return None
+
+
+def get_audio_duration(audio_path: str) -> float:
+    """Return duration in seconds using ffprobe. Returns 0.0 on failure."""
+    try:
+        result = subprocess.run(
+            [
+                "ffprobe", "-v", "error",
+                "-show_entries", "format=duration",
+                "-of", "default=noprint_wrappers=1:nokey=1",
+                audio_path,
+            ],
+            capture_output=True, text=True, timeout=10,
+        )
+        return float(result.stdout.strip())
+    except Exception:
+        return 0.0
 
 
 def generate_audio_from_text(text: str) -> str | None:

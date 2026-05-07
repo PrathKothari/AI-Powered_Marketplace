@@ -7,6 +7,7 @@ from pydantic import computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 load_dotenv(".env.local")
+load_dotenv(".env")
 
 class Settings(BaseSettings):
     """
@@ -29,7 +30,7 @@ class Settings(BaseSettings):
     STORY_SECONDS_PER_IMAGE: int = 4
     STORY_VIDEO_FPS: int = 30
     TEMP_DIR: str = "temp"
-    GEMINI_MODEL_NAME: str = Field(default="gemini-1.5-flash", validation_alias=AliasChoices("GEMINI_MODEL_NAME", "VERTEX_MODEL"))
+    GEMINI_MODEL_NAME: str = Field(default="gemini-2.5-flash", validation_alias=AliasChoices("GEMINI_MODEL_NAME", "VERTEX_MODEL"))
     GOOGLE_CLOUD_LOCATION: str = Field(default="us-central1", validation_alias=AliasChoices("GOOGLE_CLOUD_LOCATION", "GCP_REGION"))
     GOOGLE_CLOUD_PROJECT: str = Field(default="", validation_alias=AliasChoices("GOOGLE_CLOUD_PROJECT", "GCP_PROJECT_ID"))
 
@@ -71,6 +72,10 @@ class Settings(BaseSettings):
     ML_MODEL_PATH: str = "./app/ml/models"
     GEMINI_API_KEY: Optional[str] = None
     HF_TOKEN: Optional[str] = None
+
+    # Veo video generation
+    VEO_ENABLED: bool = False
+    VEO_MODEL_ID: str = "veo-3.1-fast-generate-001"
 
     model_config = SettingsConfigDict(
         case_sensitive=True,

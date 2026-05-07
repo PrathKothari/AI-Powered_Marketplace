@@ -141,11 +141,14 @@ async def show_cart(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def handle_cart_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Route cart-related inline keyboard callbacks."""
     query = update.callback_query
-    await query.answer()
     data: str = query.data or ""
 
     session: Dict[str, Any] = context.user_data.get(AUTH_SESSION_CACHE_KEY) or {}
     uid: str = session.get("uid") or ""
+
+    if not uid:
+        await query.answer("Please log in first.", show_alert=True)
+        return
 
     # ── cart_add:{product_id} ─────────────────────────────────────────────
     if data.startswith("cart_add:"):
@@ -165,7 +168,17 @@ async def handle_cart_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         product = doc.to_dict() or {}
         product["id"] = doc.id
         count = _add_to_cart(uid, product)
-        await query.answer(f"Added to cart! ({count} item{'s' if count != 1 else ''})")
+        title = product.get("title") or "Item"
+
+        await query.answer(f"Added to cart!")
+        await query.message.reply_text(
+            f"✅ *{title}* added to cart!\n\nYou have {count} item{'s' if count != 1 else ''} in your cart. Ready to checkout?",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("💳 Checkout Now", callback_data="checkout:start")],
+                [InlineKeyboardButton("🛒 View Cart", callback_data="show_cart")],
+            ]),
+        )
         return
 
     # ── cart_remove:{product_id} ─────────────────────────────────────────
@@ -201,8 +214,31 @@ async def handle_cart_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 
     # ── cart_clear ────────────────────────────────────────────────────────
     if data == "cart_clear":
+        await query.answer("Cart cleared.")
         _clear_cart(uid)
         await query.edit_message_text("🛒 Cart cleared.")
+        return
+
+    # ── show_cart ─────────────────────────────────────────────────────────
+    if data == "show_cart":
+        await query.answer()
+        cart = _get_cart(uid)
+        items: List[Dict[str, Any]] = cart.get("items") or []
+        if not items:
+            await query.message.reply_text("🛒 Your cart is empty.")
+            return
+        total = sum((i.get("price") or 0) * i.get("quantity", 1) for i in items)
+        lines = ["🛒 *Your Cart*\n"]
+        for item in items:
+            qty = item.get("quantity", 1)
+            price_str = f"₹{item.get('price')}" if item.get("price") is not None else "—"
+            lines.append(f"• {item.get('title', 'Item')} ×{qty} — {price_str}")
+        lines.append(f"\n*Total: ₹{total:.2f}*")
+        await query.message.reply_text(
+            "\n".join(lines),
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=_cart_keyboard(items, has_items=True),
+        )
         return
 
     # ── cart_detail:{product_id} ─────────────────────────────────────────
@@ -220,6 +256,7 @@ async def handle_cart_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             await query.answer("Product not found.", show_alert=True)
             return
 
+        await query.answer()
         p = doc.to_dict() or {}
         cart = _get_cart(uid)
         cart_item = next(
@@ -236,6 +273,7 @@ async def handle_cart_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             f"Unit price: ₹{price}\n"
             f"Subtotal: ₹{subtotal}"
         )
-        await query.answer()
         await query.message.reply_text(text, parse_mode=ParseMode.MARKDOWN)
         return
+
+    await query.answer()

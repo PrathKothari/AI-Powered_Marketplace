@@ -27,7 +27,6 @@ export default function ProductPage() {
 
   const [product, setProduct] = useState<Product | undefined>(undefined)
   const [allProducts, setAllProducts] = useState<Product[]>([])
-  const [isLoading, setIsLoading] = useState(true)
   const [loadingProduct, setLoadingProduct] = useState(true)
 
   // Reviews state
@@ -39,28 +38,6 @@ export default function ProductPage() {
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      const products = getProducts()
-      setAllProducts(products)
-      setProduct(products.find(p => String(p.id) === String(productId)))
-
-      // Load reviews dynamically from localStorage
-      const storageKey = `reviews-${productId}`
-      const stored = localStorage.getItem(storageKey)
-      if (stored) {
-        setReviews(JSON.parse(stored))
-      } else {
-        const initialMock = [
-          { name: "Rahul", rating: 5, comment: "Amazing quality!" },
-          { name: "Priya", rating: 4, comment: "Loved it" }
-        ]
-        setReviews(initialMock)
-        localStorage.setItem(storageKey, JSON.stringify(initialMock))
-      }
-      setIsLoading(false)
-    }, 1000)
-
-    return () => clearTimeout(timer)
     getCatalogProducts().then((data) => {
       const products: Product[] = data.map((doc: any) => ({
         id: doc.productId ?? doc.id,
@@ -81,6 +58,7 @@ export default function ProductPage() {
         category: doc.craftType ?? '',
         rating: doc.rating ?? 0,
         storyVideo: doc.storyVideo || '',
+        reelUrl: doc.reelUrl || '',
         relatedProducts: [],
       }))
       setAllProducts(products)
@@ -140,6 +118,9 @@ export default function ProductPage() {
     ? (rawStoryVideo.startsWith('/') ? `${API_ROOT}${rawStoryVideo}` : rawStoryVideo)
     : ''
 
+  const rawReelUrl = (product as any)?.reelUrl || ''
+  const reelUrl = rawReelUrl.startsWith('http') ? rawReelUrl : ''
+
   const handleAddToCart = () => {
     if (!product) return
     addToCart({
@@ -152,38 +133,10 @@ export default function ProductPage() {
     router.push('/buyer/cart')
   }
 
-  if (isLoading) {
   if (loadingProduct) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="w-12 h-12 rounded-full border-4 border-primary border-t-transparent animate-spin" />
-      </div>
-    )
-  }
-
-  if (!product) {
-    return (
-      <div className="min-h-screen bg-slate-50">
-        <div className="max-w-7xl mx-auto px-6 py-10">
-          <Skeleton className="h-4 w-32 mb-6" />
-          <div className="grid gap-10 lg:grid-cols-3">
-            <div className="lg:col-span-2 space-y-6">
-              <div className="rounded-xl bg-white p-5 shadow-sm border border-border space-y-4">
-                <Skeleton className="h-10 w-3/4" />
-                <Skeleton className="h-6 w-24" />
-                <Skeleton className="h-20 w-full" />
-                <Skeleton className="h-12 w-full mt-4" />
-                <div className="flex gap-4 pt-4">
-                   <Skeleton className="h-48 w-full rounded-lg" />
-                   <Skeleton className="h-48 w-full rounded-lg" />
-                </div>
-              </div>
-            </div>
-            <aside className="space-y-6">
-              <Skeleton className="h-72 w-full rounded-xl" />
-            </aside>
-          </div>
-        </div>
       </div>
     )
   }
@@ -263,6 +216,26 @@ export default function ProductPage() {
                 ))}
               </div>
             </div>
+
+            {reelUrl && (
+              <div className="rounded-xl bg-white p-5 shadow-sm border border-border">
+                <h2 className="text-xl font-semibold mb-1">Watch the story behind this piece</h2>
+                <p className="text-xs text-muted-foreground mb-4">AI-generated reel by the artisan</p>
+                <div className="flex justify-center">
+                  <div className="w-full max-w-[360px] aspect-[9/16] rounded-xl overflow-hidden shadow-lg bg-black">
+                    <video
+                      src={reelUrl}
+                      autoPlay
+                      muted
+                      loop
+                      playsInline
+                      controls
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
 
             {storyVideo && (
               <div className="rounded-xl bg-white p-5 shadow-sm border border-border">
@@ -398,7 +371,6 @@ export default function ProductPage() {
                 </Button>
                 <Button
                   className="w-full"
-                  variant="secondary"
                   onClick={() => {
                     if (!product) return
                     addToCart({ id: product.id, name: product.name, price: product.price, image: product.images?.[0] ?? '' })

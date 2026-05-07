@@ -33,7 +33,8 @@ export default function ReelsPage() {
 
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([])
 
-  // Fetch products with real story videos from the catalog.
+  // Fetch products with reel/story videos from the catalog.
+  // Prefer the new job-based reelUrl; fall back to storyVideo.
   // Exclude stale/mock URLs (blob: URLs, external placeholders).
   useEffect(() => {
     getCatalogProducts()
@@ -46,10 +47,10 @@ export default function ReelsPage() {
           !url.includes('pexels.com')
 
         const reelsFromProducts: Reel[] = products
-          .filter((p: any) => isRealVideo(p.storyVideo))
+          .filter((p: any) => isRealVideo(p.reelUrl) || isRealVideo(p.storyVideo))
           .map((p: any) => ({
             productId: p.productId || p.id,
-            video: resolveVideoUrl(p.storyVideo),
+            video: resolveVideoUrl(isRealVideo(p.reelUrl) ? p.reelUrl : p.storyVideo),
             title: p.title || 'Untitled Painting',
             artisan: p.artisanName || p.artisanId || 'Unknown Artisan',
             location: p.region || 'India',

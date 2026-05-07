@@ -7,11 +7,13 @@ Scheduled jobs: order status polling, review prompts, stock alerts,
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any, Dict, List, Optional
 
 import httpx
 from firebase_admin import firestore as fa_firestore
+from google.cloud.firestore_v1.base_query import FieldFilter
 from telegram.ext import ContextTypes
 
 from app.core.config import settings
@@ -65,19 +67,18 @@ async def job_order_status_notifications(context: ContextTypes.DEFAULT_TYPE) -> 
     """Poll for orders whose status changed to 'shipped' and notify buyers."""
     db = _db()
     try:
-        # Find shipped orders not yet notified
         docs = (
             db.collection("orders")
-            .where("status", "==", "shipped")
-            .where("shippingNotified", "==", False)
-            .limit(50)
+            .where(filter=FieldFilter("status", "==", "shipped"))
+            .limit(100)
             .stream()
         )
         orders: List[Dict[str, Any]] = []
         for doc in docs:
             o = doc.to_dict() or {}
             o["_id"] = doc.id
-            orders.append(o)
+            if not o.get("shippingNotified"):  # filter in Python — no composite index needed
+                orders.append(o)
     except Exception as exc:
         logger.error("order_status_notifications query failed: %s", exc)
         return
@@ -104,16 +105,16 @@ async def job_review_prompts(context: ContextTypes.DEFAULT_TYPE) -> None:
     try:
         docs = (
             db.collection("orders")
-            .where("status", "==", "delivered")
-            .where("reviewPromptSent", "!=", True)
-            .limit(50)
+            .where(filter=FieldFilter("status", "==", "delivered"))
+            .limit(100)
             .stream()
         )
         orders: List[Dict[str, Any]] = []
         for doc in docs:
             o = doc.to_dict() or {}
             o["_id"] = doc.id
-            orders.append(o)
+            if not o.get("reviewPromptSent"):  # filter in Python
+                orders.append(o)
     except Exception as exc:
         logger.error("review_prompts query failed: %s", exc)
         return
@@ -140,17 +141,17 @@ async def job_stock_alerts(context: ContextTypes.DEFAULT_TYPE) -> None:
     try:
         docs = (
             db.collection("products")
-            .where("active", "==", True)
-            .where("stock", "<=", 3)
-            .where("lowStockAlerted", "!=", True)
-            .limit(50)
+            .where(filter=FieldFilter("active", "==", True))
+            .limit(200)
             .stream()
         )
         products: List[Dict[str, Any]] = []
         for doc in docs:
             p = doc.to_dict() or {}
             p["_id"] = doc.id
-            products.append(p)
+            # Both conditions checked in Python — avoids composite index
+            if p.get("stock", 999) <= 3 and not p.get("lowStockAlerted"):
+                products.append(p)
     except Exception as exc:
         logger.error("stock_alerts query failed: %s", exc)
         return
@@ -179,8 +180,7 @@ async def job_live_stream_notifications(context: ContextTypes.DEFAULT_TYPE) -> N
     try:
         docs = (
             db.collection("live_sessions")
-            .where("status", "==", "live")
-            .where("startNotified", "!=", True)
+            .where(filter=FieldFilter("status", "==", "live"))
             .limit(20)
             .stream()
         )
@@ -188,7 +188,8 @@ async def job_live_stream_notifications(context: ContextTypes.DEFAULT_TYPE) -> N
         for doc in docs:
             s = doc.to_dict() or {}
             s["_id"] = doc.id
-            sessions.append(s)
+            if not s.get("startNotified"):  # filter in Python
+                sessions.append(s)
     except Exception as exc:
         logger.error("live_stream_notifications query failed: %s", exc)
         return
@@ -198,11 +199,10 @@ async def job_live_stream_notifications(context: ContextTypes.DEFAULT_TYPE) -> N
         session_id: str = session.get("_id") or ""
         title: str = session.get("title") or "Live Stream"
 
-        # Find buyers who have purchased from this artisan
         try:
             order_docs = (
                 db.collection("orders")
-                .where("paymentStatus", "==", "paid")
+                .where(filter=FieldFilter("paymentStatus", "==", "paid"))
                 .limit(200)
                 .stream()
             )
@@ -233,17 +233,36 @@ async def job_live_stream_notifications(context: ContextTypes.DEFAULT_TYPE) -> N
             logger.warning("Could not mark live session %s notified: %s", session_id, exc)
 
 
+async def job_reel_cleanup(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Fail stale reel jobs (older than 15 min, not terminal) and notify sellers."""
+    from app.services.storytelling import job_service  # local import avoids circular deps
+
+    try:
+        failed_seller_ids = await asyncio.get_event_loop().run_in_executor(
+            None, job_service.fail_stale_jobs
+        )
+    except Exception as exc:
+        logger.error("reel_cleanup: fail_stale_jobs raised: %s", exc)
+        return
+
+    for seller_id in failed_seller_ids:
+        telegram_id = _get_telegram_id(seller_id)
+        if telegram_id:
+            await send_telegram_message(
+                telegram_id,
+                "Your reel generation timed out after 15 minutes. "
+                "Please try again from your dashboard.",
+            )
+
+
 # ──────────────────────────────────────────────
 # Job registration helper
 # ──────────────────────────────────────────────
 
 def register_notification_jobs(job_queue) -> None:
     """Register all periodic notification jobs with PTB's JobQueue."""
-    # Order shipped — check every 5 minutes
     job_queue.run_repeating(job_order_status_notifications, interval=300, first=30)
-    # Review prompts — check every 6 hours
     job_queue.run_repeating(job_review_prompts, interval=21600, first=60)
-    # Stock alerts — check every hour
     job_queue.run_repeating(job_stock_alerts, interval=3600, first=90)
-    # Go-live notifications — check every 2 minutes
     job_queue.run_repeating(job_live_stream_notifications, interval=120, first=10)
+    job_queue.run_repeating(job_reel_cleanup, interval=600, first=120)  # every 10 min
