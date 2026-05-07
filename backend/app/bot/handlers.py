@@ -18,6 +18,9 @@ from telegram import Update
 from telegram.constants import ParseMode, ChatAction
 from telegram.ext import ContextTypes
 
+from app.bot.auth.middleware import AUTH_SESSION_CACHE_KEY, fetch_session, get_telegram_user_id, require_auth
+from app.bot.auth.strings import LANGUAGE_LABELS, LANGUAGE_NAMES, normalize_language, t
+from app.bot.menu import MENU_BROWSE, MENU_CART, MENU_COMMANDS, MENU_DASHBOARD, MENU_ORDERS, MENU_SELL, main_menu_keyboard
 from app.core.config import settings
 from app.ml.embeddings import get_image_embedding
 from app.ml.text_embeddings import get_text_embedding
@@ -25,7 +28,17 @@ from app.ml.text_embeddings import get_text_embedding
 logger = logging.getLogger(__name__)
 
 SIMILARITY_THRESHOLD = 0.55
-FRONTEND_URL = "http://localhost:3001"
+
+
+def _safe_markdown(text: str) -> str:
+    """Strip parse_mode entirely by returning plain text when Markdown is unbalanced."""
+    # Count unpaired markers — if odd count of * or _ Telegram will reject it
+    for marker in ("*", "_"):
+        if text.count(marker) % 2 != 0:
+            # Fallback: strip all markdown markers so it sends as plain text
+            return text.replace("*", "").replace("_", "").replace("`", "")
+    return text
+FRONTEND_URL = settings.FRONTEND_URL
 
 
 # ──────────────────────────────────────────────
@@ -44,6 +57,37 @@ def _get_pinecone_image_index():
 
 def _get_db():
     return fa_firestore.client()
+
+
+def _get_session_language(context: ContextTypes.DEFAULT_TYPE) -> str:
+    session = context.user_data.get(AUTH_SESSION_CACHE_KEY) or {}
+    return normalize_language(session.get("language"))
+
+
+def _language_instruction(language_code: str) -> str:
+    language_name = LANGUAGE_NAMES[normalize_language(language_code)]
+    return f"Always respond in {language_name}."
+
+
+def _mask_phone(phone: str | None) -> str:
+    if not phone:
+        return "Not set"
+    if len(phone) <= 5:
+        return phone
+    return f"{phone[:3]}{'*' * max(len(phone) - 7, 2)}{phone[-4:]}"
+
+
+def _profile_text(session: dict[str, Any]) -> str:
+    language = normalize_language(session.get("language"))
+    verification_key = "verified_contact" if session.get("phoneVerified") else "not_verified"
+    return t(
+        language,
+        "profile",
+        name=session.get("name") or "Not set",
+        language_label=LANGUAGE_LABELS[language],
+        phone=_mask_phone(session.get("phone")),
+        verification=t(language, verification_key),
+    )
 
 
 def _fetch_product_from_firestore(db, product_id: str) -> Dict[str, Any] | None:
@@ -108,7 +152,7 @@ def _classify_intent(user_query: str) -> str:
     return "search" if len(user_query.split()) > 3 else "chat"
 
 
-def _gemini_conversation(user_query: str) -> str:
+def _gemini_conversation(user_query: str, language_code: str = "en") -> str:
     """Handle general conversation using Gemini."""
     if not settings.GEMINI_API_KEY:
         return "🙏 Namaste! I'm KalaSetu Bot. Ask me about Indian art and crafts, or send me a photo to identify!"
@@ -128,6 +172,7 @@ Guidelines:
 - If their message seems like it could be product-related, gently suggest they can ask you to find specific crafts
 - Use Telegram markdown: *bold*, _italic_. Do NOT use # headers.
 - Always maintain a warm, cultured, Indian hospitality tone
+- {_language_instruction(language_code)}
 
 The user said: "{user_query}"
 
@@ -144,7 +189,12 @@ Respond naturally:"""
         return "🙏 Namaste! I'm KalaSetu Bot. I can help you find beautiful Indian art and crafts. Just ask me about any art form or send me a photo!"
 
 
-def _gemini_product_response(user_query: str, matched_products: List[Dict[str, Any]], is_image: bool = False) -> str:
+def _gemini_product_response(
+    user_query: str,
+    matched_products: List[Dict[str, Any]],
+    is_image: bool = False,
+    language_code: str = "en",
+) -> str:
     """Use Gemini to compose a friendly, helpful product search reply."""
     if not settings.GEMINI_API_KEY:
         return _fallback_format(matched_products, is_image)
@@ -172,7 +222,7 @@ Respond naturally like a helpful friend:
 4. Invite them to keep exploring
 
 Keep it concise and conversational (under 250 words). Use Telegram markdown (*bold*, _italic_).
-Do NOT use # headers. Be warm, not corporate."""
+Do NOT use # headers. Be warm, not corporate. {_language_instruction(language_code)}"""
     else:
         prompt = f"""You are KalaSetu Bot — a friendly, conversational assistant for an Indian art marketplace.
 
@@ -187,7 +237,7 @@ Respond warmly:
 4. Mention they can list their own crafts too at {FRONTEND_URL}/sell
 
 Keep it concise and friendly. Use Telegram markdown (*bold*, _italic_).
-Do NOT use # headers. Be encouraging, not apologetic."""
+Do NOT use # headers. Be encouraging, not apologetic. {_language_instruction(language_code)}"""
 
     try:
         response = client.models.generate_content(
@@ -232,8 +282,24 @@ def _fallback_format(products: List[Dict[str, Any]], is_image: bool = False) -> 
 # Command Handlers
 # ──────────────────────────────────────────────
 
+@require_auth
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /start command."""
+    telegram_id = get_telegram_user_id(update)
+    session = context.user_data.get(AUTH_SESSION_CACHE_KEY)
+    if not session and telegram_id is not None:
+        session = fetch_session(telegram_id)
+        context.user_data[AUTH_SESSION_CACHE_KEY] = session or {}
+
+    if session and session.get("uid"):
+        language = normalize_language(session.get("language"))
+        name = session.get("name") or "there"
+        await update.message.reply_text(
+            t(language, "welcome_back", name=name),
+            reply_markup=main_menu_keyboard(),
+        )
+        return
+
     welcome = (
         "🙏 *Namaste! Welcome to KalaSetu Bot*\n\n"
         "I'm your friendly assistant for discovering authentic Indian art and crafts.\n\n"
@@ -247,10 +313,16 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• Or just send a photo of any craft!\n\n"
         f"🛍️ [Visit our Marketplace]({FRONTEND_URL}/marketplace)"
     )
-    await update.message.reply_text(welcome, parse_mode=ParseMode.MARKDOWN, disable_web_page_preview=True)
+    await update.message.reply_text(
+        welcome,
+        parse_mode=ParseMode.MARKDOWN,
+        disable_web_page_preview=True,
+        reply_markup=main_menu_keyboard(),
+    )
 
 
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+@require_auth
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):  # noqa: ARG001
     """Handle /help command."""
     help_text = (
         "*KalaSetu Bot — Help*\n\n"
@@ -271,13 +343,34 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Text Message Handler
 # ──────────────────────────────────────────────
 
+@require_auth
 async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle incoming text messages — classify intent, then chat or search."""
+    """Handle incoming text messages — route menu taps, then classify intent for chat/search."""
     user_query = update.message.text.strip()
     if not user_query:
         return
 
+    # ── Persistent menu button routing ────────────────────────────────────
+    if user_query in MENU_COMMANDS:
+        from app.bot.catalog.handlers import show_categories, show_recommendations
+        from app.bot.cart.handlers import show_cart
+        from app.bot.orders.handlers import show_dashboard, show_order_history
+        from app.bot.sell.conversation import start_sell_flow
+
+        if user_query == MENU_BROWSE:
+            await show_categories(update, context)
+        elif user_query == MENU_SELL:
+            await start_sell_flow(update, context)
+        elif user_query == MENU_CART:
+            await show_cart(update, context)
+        elif user_query == MENU_ORDERS:
+            await show_order_history(update, context)
+        elif user_query == MENU_DASHBOARD:
+            await show_dashboard(update, context)
+        return
+
     await update.message.chat.send_action(ChatAction.TYPING)
+    language = _get_session_language(context)
 
     try:
         # 1. Classify intent: is this a product search or casual chat?
@@ -286,7 +379,7 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
 
         if intent == "chat":
             # Pure conversation — no product search needed
-            response_text = _gemini_conversation(user_query)
+            response_text = _safe_markdown(_gemini_conversation(user_query, language_code=language))
             await update.message.reply_text(
                 response_text,
                 parse_mode=ParseMode.MARKDOWN,
@@ -327,7 +420,9 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
                 })
 
         # 3. Generate conversational product response
-        response_text = _gemini_product_response(user_query, matched_products[:3])
+        response_text = _safe_markdown(
+            _gemini_product_response(user_query, matched_products[:3], language_code=language)
+        )
 
         await update.message.reply_text(
             response_text,
@@ -358,9 +453,11 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
 # Image Message Handler
 # ──────────────────────────────────────────────
 
+@require_auth
 async def handle_image_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle incoming image messages — CLIP-based visual search."""
     await update.message.chat.send_action(ChatAction.TYPING)
+    language = _get_session_language(context)
 
     try:
         photo = update.message.photo[-1]
@@ -412,7 +509,9 @@ async def handle_image_message(update: Update, context: ContextTypes.DEFAULT_TYP
                 "similarity": round(score, 3),
             })
 
-        response_text = _gemini_product_response("", matched_products[:3], is_image=True)
+        response_text = _safe_markdown(
+            _gemini_product_response("", matched_products[:3], is_image=True, language_code=language)
+        )
 
         await update.message.reply_text(
             response_text,
