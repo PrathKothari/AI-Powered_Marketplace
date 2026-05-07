@@ -13,160 +13,264 @@ type ProductInventory = {
   sales: number
   trend: "high" | "low" | "stable"
 }
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '@/context/AuthContext'
+import { getMyListings, updateListing, deleteListing } from '@/lib/api'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Package, Plus, ArrowLeft, Star, Pencil, Trash2, X, Loader2 } from 'lucide-react'
+import Link from 'next/link'
+import { toast } from 'sonner'
 
-const mockData: ProductInventory[] = [
-  { id: 1, name: "Handwoven Basket", stock: 12, sales: 30, trend: "high" },
-  { id: 2, name: "Ceramic Mug Set", stock: 4, sales: 22, trend: "low" },
-  { id: 3, name: "Leather Journal", stock: 45, sales: 10, trend: "stable" },
-]
+export default function InventoryPage() {
+  const router = useRouter()
+  const { user, loading } = useAuth()
+  const [listings, setListings] = useState<any[]>([])
+  const [dataLoading, setDataLoading] = useState(true)
+
+  // Edit modal state
+  const [editItem, setEditItem] = useState<any>(null)
+  const [editForm, setEditForm] = useState({ title: '', price: '', description: '', materials: '' })
+  const [editSaving, setEditSaving] = useState(false)
+
+  // Delete confirmation
+  const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [deleteLoading, setDeleteLoading] = useState(false)
+
+  useEffect(() => {
+    if (!loading && !user) router.push('/login')
+  }, [user, loading, router])
+
+  useEffect(() => {
+    if (!user) return
+    getMyListings().then(data => {
+      setListings(data)
+      setDataLoading(false)
+    })
+  }, [user])
+
+  const openEdit = (item: any) => {
+    setEditItem(item)
+    setEditForm({
+      title: item.title ?? '',
+      price: String(item.price ?? ''),
+      description: item.description ?? '',
+      materials: item.materials ?? '',
+    })
+  }
+
+  const handleEditSave = async () => {
+    if (!editItem) return
+    setEditSaving(true)
+    try {
+      const updated = await updateListing(editItem.productId, {
+        title: editForm.title,
+        price: parseFloat(editForm.price),
+        description: editForm.description,
+        materials: editForm.materials,
+      })
+      setListings(prev => prev.map(l => l.productId === editItem.productId ? { ...l, ...updated } : l))
+      toast.success('Listing updated!')
+      setEditItem(null)
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update listing')
+    } finally {
+      setEditSaving(false)
+    }
+  }
+
+  const handleDelete = async (productId: string) => {
+    setDeleteLoading(true)
+    try {
+      await deleteListing(productId)
+      setListings(prev => prev.filter(l => l.productId !== productId))
+      toast.success('Listing deleted')
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete listing')
+    } finally {
+      setDeleteLoading(false)
+      setDeleteId(null)
+    }
+  }
+
+  if (loading || !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    )
+  }
+
+  const lowStock = listings.filter(p => (p.stock ?? 0) <= 3)
 
 export default function SmartInventoryPage() {
   const router = useRouter()
 
   return (
-    <div className="container mx-auto p-6 space-y-8 max-w-7xl animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* Header */}
+    <div className="container mx-auto p-6 space-y-8 max-w-5xl">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Smart Inventory Insights</h1>
-          <p className="text-muted-foreground mt-1">AI-powered demand forecasting for your products</p>
+          <Link href="/dashboard" className="inline-flex items-center text-sm text-slate-500 hover:text-primary mb-2">
+            <ArrowLeft className="w-4 h-4 mr-1" /> Back to Dashboard
+          </Link>
+          <h1 className="text-3xl font-bold tracking-tight">My Inventory</h1>
+          <p className="text-muted-foreground mt-1">Manage your listed paintings</p>
         </div>
         <Button className="gap-2" onClick={() => router.push("/analytics") }>
           View Detailed Analytics
           <ArrowRight className="w-4 h-4" />
+        <Button onClick={() => router.push('/sell')} className="gap-2">
+          <Plus className="w-4 h-4" /> List New Painting
         </Button>
       </div>
 
-      {/* Alerts Section */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card className="bg-red-500/10 border-red-500/20 shadow-none">
+      {!dataLoading && lowStock.length > 0 && (
+        <Card className="bg-red-50 border-red-200">
           <CardContent className="p-4 flex items-center gap-3">
-            <AlertCircle className="w-5 h-5 text-red-500" />
-            <span className="font-medium text-red-700 dark:text-red-400">⚠️ 2 products low in stock</span>
+            <Package className="w-5 h-5 text-red-500" />
+            <span className="font-medium text-red-700">{lowStock.length} painting{lowStock.length > 1 ? 's' : ''} with low stock (≤3 units)</span>
           </CardContent>
         </Card>
-        <Card className="bg-orange-500/10 border-orange-500/20 shadow-none">
-          <CardContent className="p-4 flex items-center gap-3">
-            <TrendingUp className="w-5 h-5 text-orange-500" />
-            <span className="font-medium text-orange-700 dark:text-orange-400">📈 3 products trending this week</span>
-          </CardContent>
+      )}
+
+      {dataLoading ? (
+        <div className="flex justify-center py-20">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        </div>
+      ) : listings.length === 0 ? (
+        <Card className="p-16 text-center">
+          <Package className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+          <p className="text-slate-500 mb-4">You haven't listed any paintings yet.</p>
+          <Button onClick={() => router.push('/sell')}>List Your First Painting</Button>
         </Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Main Content: Left Column */}
-        <div className="lg:col-span-2 space-y-8">
-          
-          {/* Inventory Cards Grid */}
-          <div>
-            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-              <Package className="w-5 h-5 text-muted-foreground" /> Current Inventory
-            </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {mockData.map((item) => (
-                <Card key={item.id} className="overflow-hidden transition-all hover:shadow-md border-border/50">
-                  <CardHeader className="p-4 pb-2">
-                    <div className="flex justify-between items-start">
-                      <CardTitle className="text-lg">{item.name}</CardTitle>
-                      <Badge 
-                        variant={item.trend === "high" ? "default" : item.trend === "low" ? "destructive" : "secondary"}
-                        className={
-                          item.trend === "high" ? "bg-orange-500 hover:bg-orange-600 text-white" : 
-                          item.trend === "stable" ? "bg-green-500/20 text-green-700 hover:bg-green-500/30 dark:bg-green-500/20 dark:text-green-400 border-green-500/20" : ""
-                        }
-                      >
-                        {item.trend === "high" ? "High Demand 🔥" : 
-                         item.trend === "low" ? "Low Stock ⚠️" : "Stable"}
-                      </Badge>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {listings.map((item) => {
+            const stock = item.stock ?? 0
+            const isLow = stock <= 3
+            return (
+              <Card key={item.productId} className="overflow-hidden hover:shadow-md transition-shadow">
+                <CardHeader className="p-4 pb-2">
+                  <div className="flex justify-between items-start gap-2">
+                    <CardTitle className="text-base leading-tight">{item.title}</CardTitle>
+                    <Badge variant={isLow ? 'destructive' : 'secondary'} className={isLow ? '' : 'bg-green-100 text-green-700'}>
+                      {isLow ? 'Low Stock' : 'In Stock'}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{item.craftType} · {item.region}</p>
+                </CardHeader>
+                <CardContent className="p-4 pt-2">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Stock</p>
+                      <p className="text-2xl font-bold font-mono">{stock}</p>
                     </div>
-                  </CardHeader>
-                  <CardContent className="p-4 pt-2">
-                    <div className="flex justify-between items-end mt-2">
-                      <div>
-                        <p className="text-sm text-muted-foreground font-medium">Current Stock</p>
-                        <p className="text-2xl font-bold font-mono tracking-tight">{item.stock}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm text-muted-foreground font-medium">Sales (30d)</p>
-                        <p className="text-xl font-semibold font-mono tracking-tight">{item.sales}</p>
-                      </div>
+                    <div className="text-right">
+                      <p className="text-xs text-muted-foreground">Price</p>
+                      <p className="text-lg font-bold text-primary">₹{item.price}</p>
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
-
-          {/* Chart Section */}
-          <Card className="border-border/50">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <BarChart3 className="w-5 h-5 text-muted-foreground" /> Sales Trend (Last 7 days)
-              </CardTitle>
-              <CardDescription>Mock chart data representing daily sales volume.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[200px] w-full flex items-end gap-3 pt-4">
-                {[40, 60, 30, 80, 50, 90, 100].map((h, i) => (
-                  <div key={i} className="flex-1 bg-primary/20 hover:bg-primary/40 rounded-t-sm transition-all relative group cursor-pointer" style={{ height: `${h}%` }}>
-                    <div className="opacity-0 group-hover:opacity-100 absolute -top-8 left-1/2 -translate-x-1/2 bg-popover text-popover-foreground text-xs px-2 py-1 rounded shadow-sm border border-border transition-opacity duration-200">
-                      {h}
+                    <div className="text-right">
+                      <p className="text-xs text-muted-foreground">Rating</p>
+                      <p className="text-lg font-semibold flex items-center gap-1">
+                        <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                        {(item.rating ?? 0) > 0 ? item.rating.toFixed(1) : '—'}
+                      </p>
                     </div>
                   </div>
-                ))}
-              </div>
-              <div className="flex justify-between text-xs text-muted-foreground mt-4 px-1">
-                <span>Mon</span>
-                <span>Tue</span>
-                <span>Wed</span>
-                <span>Thu</span>
-                <span>Fri</span>
-                <span>Sat</span>
-                <span>Sun</span>
-              </div>
-            </CardContent>
-          </Card>
-
+                  <div className="mt-3 flex gap-2">
+                    <Button variant="outline" size="sm" className="flex-1" onClick={() => router.push(`/product/${item.productId}`)}>
+                      View
+                    </Button>
+                    <Button variant="outline" size="sm" className="flex-1 gap-1" onClick={() => openEdit(item)}>
+                      <Pencil className="w-3.5 h-3.5" /> Edit
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-destructive border-destructive/30 hover:bg-destructive/5"
+                      onClick={() => setDeleteId(item.productId)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })}
         </div>
+      )}
 
-        {/* Right Column: AI Insights */}
-        <div className="space-y-6">
-          <Card className="border-indigo-500/20 shadow-indigo-500/5 shadow-xl relative overflow-hidden bg-gradient-to-b from-indigo-50/50 to-white dark:from-indigo-950/20 dark:to-background">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 blur-3xl -z-10 rounded-full" />
-            <CardHeader className="pb-3 border-b border-indigo-100 dark:border-indigo-900/50">
-              <CardTitle className="flex items-center gap-2 text-indigo-700 dark:text-indigo-400">
-                <Lightbulb className="w-5 h-5 text-indigo-500 fill-indigo-500/20" /> 
-                AI Suggestions
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-5 space-y-4">
-              <div className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-sm p-4 rounded-xl border border-indigo-100 dark:border-indigo-900/50 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5 group">
-                <p className="text-sm font-medium leading-relaxed group-hover:text-indigo-700 dark:group-hover:text-indigo-400 transition-colors">Increase production of <span className="font-semibold">Handwoven Basket</span></p>
-                <div className="flex items-center gap-1.5 mt-2">
-                  <TrendingUp className="w-3.5 h-3.5 text-indigo-500" />
-                  <p className="text-xs text-indigo-600 dark:text-indigo-400 font-medium">High demand trend detected</p>
+      {/* Edit Modal */}
+      {editItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <Card className="w-full max-w-md bg-white rounded-2xl shadow-2xl">
+            <div className="p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold">Edit Listing</h2>
+                <button onClick={() => setEditItem(null)} className="text-muted-foreground hover:text-foreground">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-sm font-semibold">Title</label>
+                  <Input value={editForm.title} onChange={e => setEditForm(f => ({ ...f, title: e.target.value }))} />
+                </div>
+                <div>
+                  <label className="text-sm font-semibold">Price (₹)</label>
+                  <Input type="number" value={editForm.price} onChange={e => setEditForm(f => ({ ...f, price: e.target.value }))} />
+                </div>
+                <div>
+                  <label className="text-sm font-semibold">Materials</label>
+                  <Input value={editForm.materials} onChange={e => setEditForm(f => ({ ...f, materials: e.target.value }))} />
+                </div>
+                <div>
+                  <label className="text-sm font-semibold">Description</label>
+                  <textarea
+                    value={editForm.description}
+                    onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
+                    className="w-full border border-input rounded-md px-3 py-2 text-sm min-h-[80px] resize-y focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
                 </div>
               </div>
-              
-              <div className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-sm p-4 rounded-xl border border-orange-100 dark:border-orange-900/50 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5 group">
-                <p className="text-sm font-medium leading-relaxed group-hover:text-orange-600 transition-colors">Restock <span className="font-semibold">Ceramic Mug Set</span></p>
-                <div className="flex items-center gap-1.5 mt-2">
-                  <AlertTriangle className="w-3.5 h-3.5 text-orange-500" />
-                  <p className="text-xs text-orange-600 dark:text-orange-400 font-medium">Stock running low</p>
-                </div>
+              <div className="flex gap-2 pt-2">
+                <Button variant="outline" className="flex-1" onClick={() => setEditItem(null)}>Cancel</Button>
+                <Button className="flex-1" onClick={handleEditSave} disabled={editSaving}>
+                  {editSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save Changes'}
+                </Button>
               </div>
-
-              <div className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-sm p-4 rounded-xl border border-green-100 dark:border-green-900/50 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5 group">
-                <p className="text-sm font-medium leading-relaxed group-hover:text-green-600 transition-colors"><span className="font-semibold">Leather Journal</span> demand expected to rise</p>
-                <div className="flex items-center gap-1.5 mt-2">
-                  <TrendingUp className="w-3.5 h-3.5 text-green-500" />
-                  <p className="text-xs text-green-600 dark:text-green-400 font-medium">Festival season approaching</p>
-                </div>
-              </div>
-            </CardContent>
+            </div>
           </Card>
         </div>
-      </div>
+      )}
+
+      {/* Delete Confirmation */}
+      {deleteId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <Card className="w-full max-w-sm bg-white rounded-2xl shadow-2xl">
+            <div className="p-6 space-y-4 text-center">
+              <div className="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center mx-auto">
+                <Trash2 className="w-7 h-7 text-red-500" />
+              </div>
+              <h2 className="text-xl font-bold">Delete Listing?</h2>
+              <p className="text-muted-foreground text-sm">This action cannot be undone. The painting will be permanently removed.</p>
+              <div className="flex gap-2">
+                <Button variant="outline" className="flex-1" onClick={() => setDeleteId(null)}>Cancel</Button>
+                <Button
+                  className="flex-1 bg-destructive hover:bg-destructive/90 text-white"
+                  onClick={() => handleDelete(deleteId)}
+                  disabled={deleteLoading}
+                >
+                  {deleteLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Delete'}
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
     </div>
   )
 }

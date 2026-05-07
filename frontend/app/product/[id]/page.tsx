@@ -7,10 +7,12 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
+import { toast } from 'sonner'
 import { useCart } from '@/context/CartContext'
 import { Product } from '@/lib/types/product'
-import { getProducts } from '@/lib/products'
-import ProductCard from '@/components/product-card'
+import { getCatalogProducts, getProductReviews, addProductReview } from '@/lib/api'
+import SellerBio from '@/components/SellerBio'
+import RecommendationsSection from '@/components/RecommendationsSection'
 
 import { Skeleton } from '@/components/ui/skeleton'
 import { Empty, EmptyMedia, EmptyHeader, EmptyTitle, EmptyDescription } from '@/components/ui/empty'
@@ -26,13 +28,15 @@ export default function ProductPage() {
   const [product, setProduct] = useState<Product | undefined>(undefined)
   const [allProducts, setAllProducts] = useState<Product[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [loadingProduct, setLoadingProduct] = useState(true)
 
   // Reviews state
-  interface Review { name: string; rating: number; comment: string; }
+  interface Review { reviewId?: string; name: string; rating: number; comment: string; createdAt?: string; }
   const [reviews, setReviews] = useState<Review[]>([])
   const [newReviewName, setNewReviewName] = useState("")
   const [newReviewRating, setNewReviewRating] = useState(5)
   const [newReviewComment, setNewReviewComment] = useState("")
+  const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -57,26 +61,63 @@ export default function ProductPage() {
     }, 1000)
 
     return () => clearTimeout(timer)
+    getCatalogProducts().then((data) => {
+      const products: Product[] = data.map((doc: any) => ({
+        id: doc.productId ?? doc.id,
+        name: doc.title ?? doc.name ?? 'Untitled Painting',
+        price: doc.price ?? 0,
+        description: doc.description ?? '',
+        images: Array.isArray(doc.images) ? doc.images : [],
+        status: (() => {
+          if (!doc.active) return 'out-of-stock'
+          const s = doc.stock ?? 0
+          if (s === 0) return 'out-of-stock'
+          if (s <= 5) return 'low-stock'
+          return 'in-stock'
+        })(),
+        stock: doc.stock,
+        artisanId: doc.artisanId ?? '',
+        artisan: { name: doc.artisanName ?? 'Unknown Artisan', location: doc.region ?? '', avatar: '' },
+        category: doc.craftType ?? '',
+        rating: doc.rating ?? 0,
+        storyVideo: doc.storyVideo || '',
+        relatedProducts: [],
+      }))
+      setAllProducts(products)
+      setProduct(products.find(p => String(p.id) === String(productId)))
+      setLoadingProduct(false)
+    }).catch(() => setLoadingProduct(false))
+
+    // Fetch reviews from backend
+    getProductReviews(productId).then(setReviews).catch(() => {})
   }, [productId])
 
-  const handleReviewSubmit = (e: React.FormEvent) => {
+  const handleReviewSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!newReviewName || !newReviewComment) return
-
-    const storageKey = `reviews-${productId}`
-    const newReview = { name: newReviewName, rating: newReviewRating, comment: newReviewComment }
-    const updated = [newReview, ...reviews]
-    setReviews(updated)
-    localStorage.setItem(storageKey, JSON.stringify(updated))
-
-    // Reset form
-    setNewReviewName("")
-    setNewReviewRating(5)
-    setNewReviewComment("")
+    if (!newReviewName || !newReviewComment || submitting) return
+    setSubmitting(true)
+    try {
+      const saved = await addProductReview(productId, {
+        name: newReviewName,
+        rating: newReviewRating,
+        comment: newReviewComment,
+      })
+      setReviews((prev) => [saved, ...prev])
+      setNewReviewName("")
+      setNewReviewRating(5)
+      setNewReviewComment("")
+      toast.success('Review posted successfully!')
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to post review. Please try again.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
-  const averageRating = reviews.length > 0 
+  const averageRating = reviews.length > 0
     ? (reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length).toFixed(1)
+    : (product?.rating ?? 0) > 0
+    ? (product!.rating!).toFixed(1)
     : "0.0"
 
   const relatedProducts = useMemo<Product[]>(() => {
@@ -86,21 +127,18 @@ export default function ProductPage() {
       .filter((p: Product | undefined): p is Product => Boolean(p))
   }, [product, allProducts])
 
-  const recommendedCategoryProducts = useMemo<Product[]>(() => {
-    if (!product || allProducts.length === 0) return []
-    
-    // Filter by same category, excluding the current product
-    const sameCategory = allProducts.filter(p => p.category === product.category && String(p.id) !== String(product.id))
-    
-    // If none found in same category, use first 3 from allProducts (excluding current product)
-    if (sameCategory.length === 0) {
-       return allProducts.filter(p => String(p.id) !== String(product.id)).slice(0, 3)
-    }
-    
-    return sameCategory.slice(0, 3)
-  }, [product, allProducts])
-
-  const storyVideo = product?.storyVideo || 'https://www.w3schools.com/html/mov_bbb.mp4'
+  // Only show the story video if the product actually has one (uploaded to our storage).
+  // Filter out stale/mock URLs (blob: URLs, external placeholders, etc.)
+  const rawStoryVideo = product?.storyVideo || ''
+  const isValidStoryVideo =
+    rawStoryVideo.length > 0 &&
+    !rawStoryVideo.startsWith('blob:') &&
+    !rawStoryVideo.includes('w3schools.com') &&
+    !rawStoryVideo.includes('pexels.com')
+  const API_ROOT = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001/api/v1').replace(/\/api\/v1$/, '')
+  const storyVideo = isValidStoryVideo
+    ? (rawStoryVideo.startsWith('/') ? `${API_ROOT}${rawStoryVideo}` : rawStoryVideo)
+    : ''
 
   const handleAddToCart = () => {
     if (!product) return
@@ -115,6 +153,15 @@ export default function ProductPage() {
   }
 
   if (isLoading) {
+  if (loadingProduct) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="w-12 h-12 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+      </div>
+    )
+  }
+
+  if (!product) {
     return (
       <div className="min-h-screen bg-slate-50">
         <div className="max-w-7xl mx-auto px-6 py-10">
@@ -173,29 +220,37 @@ export default function ProductPage() {
           <div className="lg:col-span-2 space-y-6">
             <div className="rounded-xl bg-white p-5 shadow-sm border border-border">
               <h1 className="text-3xl font-bold mb-3">{product.name}</h1>
-              <p className="text-lg font-semibold text-indigo-600 mb-2">${product.price.toFixed(2)}</p>
+              <p className="text-lg font-semibold text-primary mb-2">₹{product.price.toFixed(0)}</p>
               <p className="text-sm text-muted-foreground mb-4">{product.description}</p>
 
-              {/* Artisan Info */}
-              <div className="flex items-center gap-3 mb-5 p-3 rounded-lg bg-slate-50 border border-slate-100">
-                <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold uppercase flex-shrink-0">
-                  {product.artisan.name.charAt(0)}
+              {/* Seller Bio (falls back to basic artisan card if no bio set) */}
+              {product.artisanId ? (
+                <SellerBio
+                  userId={product.artisanId}
+                  userName={product.artisan.name}
+                  fallback={
+                    <div className="flex items-center gap-3 mb-5 p-3 rounded-lg bg-slate-50 border border-slate-100">
+                      <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold uppercase flex-shrink-0">
+                        {product.artisan.name.charAt(0)}
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-slate-800">{product.artisan.name}</p>
+                        <p className="text-xs text-muted-foreground">{product.artisan.location}</p>
+                      </div>
+                    </div>
+                  }
+                />
+              ) : (
+                <div className="flex items-center gap-3 mb-5 p-3 rounded-lg bg-slate-50 border border-slate-100">
+                  <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold uppercase flex-shrink-0">
+                    {product.artisan.name.charAt(0)}
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-slate-800">{product.artisan.name}</p>
+                    <p className="text-xs text-muted-foreground">{product.artisan.location}</p>
+                  </div>
                 </div>
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-slate-800">{product.artisan.name}</p>
-                  <p className="text-xs text-muted-foreground">{product.artisan.location}</p>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                    ✓ Verified Artisan
-                  </span>
-                  {(product.rating ?? 0) > 4 && (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-                      ⭐ Top Artisan
-                    </span>
-                  )}
-                </div>
-              </div>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 {product.images?.map((img: string, index: number) => (
@@ -209,16 +264,19 @@ export default function ProductPage() {
               </div>
             </div>
 
-            <div className="rounded-xl bg-white p-5 shadow-sm border border-border">
-              <h2 className="text-2xl font-semibold mb-4">Craft Story Video</h2>
-              {storyVideo ? (
-                <video src={storyVideo} controls className="w-full rounded-xl shadow" />
-              ) : (
-                <div className="h-60 flex items-center justify-center bg-muted rounded-xl">
-                  <p className="text-muted-foreground">Story not available</p>
+            {storyVideo && (
+              <div className="rounded-xl bg-white p-5 shadow-sm border border-border">
+                <h2 className="text-2xl font-semibold mb-4">Craft Story Video</h2>
+                <div className="w-full aspect-video rounded-xl overflow-hidden shadow-md bg-black">
+                  <video
+                    src={storyVideo}
+                    controls
+                    playsInline
+                    className="w-full h-full object-contain"
+                  />
                 </div>
-              )}
-            </div>
+              </div>
+            )}
 
             {/* Ratings & Reviews (Dynamic UI) */}
             <div className="rounded-xl bg-white p-5 shadow-sm border border-border">
@@ -268,7 +326,9 @@ export default function ProductPage() {
                   onChange={(e) => setNewReviewComment(e.target.value)}
                   className="w-full p-3 border border-slate-200 rounded-lg focus:outline-primary transition-all h-24 resize-none text-sm"
                 />
-                <Button type="submit" className="px-6 font-bold">Post Review</Button>
+                <Button type="submit" className="px-6 font-bold" disabled={submitting}>
+                  {submitting ? 'Posting...' : 'Post Review'}
+                </Button>
               </form>
 
               {/* Reviews List */}
@@ -310,6 +370,15 @@ export default function ProductPage() {
                 </div>
               </div>
             )}
+
+            <div className="rounded-xl bg-white p-5 shadow-sm border border-border">
+              <RecommendationsSection
+                title="You might also like"
+                subtitle="AI-curated picks based on this painting and your cart"
+                excludeIds={[productId]}
+                limit={6}
+              />
+            </div>
           </div>
 
           <aside className="space-y-6">
@@ -327,22 +396,20 @@ export default function ProductPage() {
                 <Button className="w-full" onClick={handleAddToCart}>
                   <ShoppingCart className="w-4 h-4 mr-2" /> Add to Cart
                 </Button>
-                <Button className="w-full" variant="secondary" onClick={() => router.push('/cart')}>
+                <Button
+                  className="w-full"
+                  variant="secondary"
+                  onClick={() => {
+                    if (!product) return
+                    addToCart({ id: product.id, name: product.name, price: product.price, image: product.images?.[0] ?? '' })
+                    router.push('/buyer/cart')
+                  }}
+                >
                   Buy Now
                 </Button>
               </div>
             </Card>
           </aside>
-        </div>
-
-        {/* You may also like Section */}
-        <div className="mt-20">
-          <h2 className="text-2xl font-bold text-slate-900 mb-8 border-b border-border pb-4">You may also like</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-            {recommendedCategoryProducts.map((p) => (
-              <ProductCard key={p.id} product={p as Product} onDeleteAction={() => {}} />
-            ))}
-          </div>
         </div>
       </div>
     </div>
