@@ -14,6 +14,9 @@ import { getCatalogProducts, getProductReviews, addProductReview } from '@/lib/a
 import SellerBio from '@/components/SellerBio'
 import RecommendationsSection from '@/components/RecommendationsSection'
 
+import { Skeleton } from '@/components/ui/skeleton'
+import { Empty, EmptyMedia, EmptyHeader, EmptyTitle, EmptyDescription } from '@/components/ui/empty'
+
 export default function ProductPage() {
   const router = useRouter()
   const params = useParams()
@@ -24,6 +27,7 @@ export default function ProductPage() {
 
   const [product, setProduct] = useState<Product | undefined>(undefined)
   const [allProducts, setAllProducts] = useState<Product[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [loadingProduct, setLoadingProduct] = useState(true)
 
   // Reviews state
@@ -35,6 +39,28 @@ export default function ProductPage() {
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
+    const timer = setTimeout(() => {
+      const products = getProducts()
+      setAllProducts(products)
+      setProduct(products.find(p => String(p.id) === String(productId)))
+
+      // Load reviews dynamically from localStorage
+      const storageKey = `reviews-${productId}`
+      const stored = localStorage.getItem(storageKey)
+      if (stored) {
+        setReviews(JSON.parse(stored))
+      } else {
+        const initialMock = [
+          { name: "Rahul", rating: 5, comment: "Amazing quality!" },
+          { name: "Priya", rating: 4, comment: "Loved it" }
+        ]
+        setReviews(initialMock)
+        localStorage.setItem(storageKey, JSON.stringify(initialMock))
+      }
+      setIsLoading(false)
+    }, 1000)
+
+    return () => clearTimeout(timer)
     getCatalogProducts().then((data) => {
       const products: Product[] = data.map((doc: any) => ({
         id: doc.productId ?? doc.id,
@@ -126,6 +152,7 @@ export default function ProductPage() {
     router.push('/buyer/cart')
   }
 
+  if (isLoading) {
   if (loadingProduct) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -136,14 +163,46 @@ export default function ProductPage() {
 
   if (!product) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center p-8 rounded-xl border border-border bg-card drop-shadow">
-          <h1 className="text-2xl font-bold mb-3">Product not found</h1>
-          <p className="text-muted-foreground mb-6">The product you are looking for could not be found.</p>
-          <Link href="/marketplace">
-            <Button>Back to Marketplace</Button>
-          </Link>
+      <div className="min-h-screen bg-slate-50">
+        <div className="max-w-7xl mx-auto px-6 py-10">
+          <Skeleton className="h-4 w-32 mb-6" />
+          <div className="grid gap-10 lg:grid-cols-3">
+            <div className="lg:col-span-2 space-y-6">
+              <div className="rounded-xl bg-white p-5 shadow-sm border border-border space-y-4">
+                <Skeleton className="h-10 w-3/4" />
+                <Skeleton className="h-6 w-24" />
+                <Skeleton className="h-20 w-full" />
+                <Skeleton className="h-12 w-full mt-4" />
+                <div className="flex gap-4 pt-4">
+                   <Skeleton className="h-48 w-full rounded-lg" />
+                   <Skeleton className="h-48 w-full rounded-lg" />
+                </div>
+              </div>
+            </div>
+            <aside className="space-y-6">
+              <Skeleton className="h-72 w-full rounded-xl" />
+            </aside>
+          </div>
         </div>
+      </div>
+    )
+  }
+
+  if (!product) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 mt-[-64px]">
+        <Empty className="max-w-md w-full bg-white rounded-3xl p-10 shadow-lg border border-slate-100 animate-in fade-in zoom-in-95 duration-500">
+          <EmptyMedia variant="icon" className="bg-slate-50 text-slate-300 ring-4 ring-slate-50/50">
+            <ShoppingCart className="w-10 h-10 opacity-50" />
+          </EmptyMedia>
+          <EmptyHeader className="space-y-3">
+            <EmptyTitle className="text-2xl font-bold tracking-tight">Product not found</EmptyTitle>
+            <EmptyDescription className="font-medium text-slate-500">The product you are looking for might have been removed or is temporarily unavailable.</EmptyDescription>
+          </EmptyHeader>
+          <Button asChild className="w-full mt-6 font-bold rounded-xl h-12">
+            <Link href="/marketplace">Back to Marketplace</Link>
+          </Button>
+        </Empty>
       </div>
     )
   }

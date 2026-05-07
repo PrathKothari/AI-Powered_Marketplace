@@ -3,6 +3,7 @@
 import { Suspense, useState, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { QRCodeSVG } from 'qrcode.react'
+import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
@@ -282,6 +283,18 @@ function SellPage() {
     img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)))
   }
 
+  if (successData) {
+     return (
+        <main className="min-h-screen bg-slate-50 px-4 py-10 flex flex-col items-center justify-center">
+          <Card className="max-w-md w-full rounded-2xl shadow-xl p-8 space-y-8 text-center border-t-8 border-t-primary">
+            <div className="space-y-2">
+              <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                 <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                 </svg>
+              </div>
+              <h2 className="text-3xl font-bold text-foreground">Product Published!</h2>
+              <p className="text-muted-foreground">Your product is now listed on KalaSetu.</p>
   if (viewState === 'generating') {
     return (
       <main className="min-h-screen bg-slate-50 flex flex-col items-center justify-center px-4">
@@ -299,6 +312,32 @@ function SellPage() {
     )
   }
 
+            <div className="p-6 border-2 border-primary/20 bg-primary/5 rounded-xl shadow-inner relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-24 h-24 bg-primary/10 rounded-full -mr-10 -mt-10 blur-xl"></div>
+                <div className="absolute bottom-0 left-0 w-24 h-24 bg-secondary/10 rounded-full -ml-10 -mb-10 blur-xl"></div>
+                
+                <h3 className="font-bold text-lg mb-6 text-foreground relative z-10 flex items-center justify-center gap-2">
+                    <span className="text-primary">✨</span> Digital Authenticity Card
+                </h3>
+                
+                <div className="inline-flex justify-center bg-white p-4 rounded-xl shadow-md mx-auto relative z-10 hover:scale-105 transition-transform">
+                    <QRCodeSVG id="qr-code-svg" value={`http://localhost:3000/product/${successData.id}`} size={180} level={"H"} />
+                </div>
+                
+                <p className="mt-6 text-sm text-primary font-semibold relative z-10 uppercase tracking-wider">
+                  This QR verifies product authenticity
+                </p>
+                
+                <div className="mt-6 text-left space-y-3 text-sm bg-white/60 p-4 rounded-lg backdrop-blur-sm relative z-10">
+                    <div className="flex justify-between border-b border-black/5 pb-2">
+                      <span className="text-muted-foreground">Product ID</span>
+                      <span className="font-mono font-medium">{successData.id}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-black/5 pb-2">
+                      <span className="text-muted-foreground">Artisan</span>
+                      <span className="font-medium text-foreground">Sofia (Mock Data)</span>
+                    </div>
+                </div>
   if (viewState === 'preview') {
     return (
       <main className="min-h-screen bg-slate-50 px-4 py-10 flex flex-col items-center justify-center">
@@ -497,6 +536,17 @@ function SellPage() {
                 />
               </div>
 
+                <div className="pt-6 border-t mt-6">
+                  <Button disabled={isSubmitting} type="submit" className="w-full py-6 text-lg shadow-lg font-bold">
+                      {isSubmitting ? (
+                        <span className="flex items-center gap-2">
+                           <Loader2 className="w-5 h-5 animate-spin" /> Publishing...
+                        </span>
+                      ) : 'Publish Product'}
+                  </Button>
+                </div>
+              </form>
+          </Card>
               {/* Image Upload Area */}
               <div className="space-y-2 md:col-span-2">
                 <label className="text-sm font-semibold text-foreground">Painting Images <span className="text-red-500">*</span></label>

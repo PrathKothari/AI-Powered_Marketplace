@@ -1,5 +1,18 @@
 'use client'
 
+import { useRouter } from "next/navigation"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { AlertTriangle, TrendingUp, Package, BarChart3, ArrowRight, Lightbulb, AlertCircle } from "lucide-react"
+
+type ProductInventory = {
+  id: number
+  name: string
+  stock: number
+  sales: number
+  trend: "high" | "low" | "stable"
+}
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
@@ -93,6 +106,9 @@ export default function InventoryPage() {
 
   const lowStock = listings.filter(p => (p.stock ?? 0) <= 3)
 
+export default function SmartInventoryPage() {
+  const router = useRouter()
+
   return (
     <div className="container mx-auto p-6 space-y-8 max-w-5xl">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -103,6 +119,9 @@ export default function InventoryPage() {
           <h1 className="text-3xl font-bold tracking-tight">My Inventory</h1>
           <p className="text-muted-foreground mt-1">Manage your listed paintings</p>
         </div>
+        <Button className="gap-2" onClick={() => router.push("/analytics") }>
+          View Detailed Analytics
+          <ArrowRight className="w-4 h-4" />
         <Button onClick={() => router.push('/sell')} className="gap-2">
           <Plus className="w-4 h-4" /> List New Painting
         </Button>

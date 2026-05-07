@@ -23,7 +23,7 @@ export function LearningCard() {
 
   return (
     <div className="bg-card rounded-2xl p-8 border border-border hover:shadow-lg transition-shadow">
-      <h3 className="text-xl font-bold text-foreground mb-2">Grow with CraftHub</h3>
+      <h3 className="text-xl font-bold text-foreground mb-2">Grow with KalaSetu</h3>
       <p className="text-sm text-foreground/60 mb-6">Learning resources</p>
 
       <div className="space-y-3">

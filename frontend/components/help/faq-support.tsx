@@ -56,7 +56,7 @@ const faqItems = [
       {
         question: 'Can I offer international shipping?',
         answer:
-          'Yes, CraftHub supports international shipping. Go to your Shop Settings and configure which countries you ship to, along with rates for each region.',
+          'Yes, KalaSetu supports international shipping. Go to your Shop Settings and configure which countries you ship to, along with rates for each region.',
       },
     ],
   },
