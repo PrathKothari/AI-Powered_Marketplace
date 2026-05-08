@@ -19,7 +19,6 @@ import {
 } from '@/lib/api'
 import ProductCard from '@/components/product-card'
 import SellerBio from '@/components/SellerBio'
-import RecommendationsSection from '@/components/RecommendationsSection'
 
 export default function ProductPage() {
   const router = useRouter()
@@ -282,7 +281,7 @@ export default function ProductPage() {
                   userName={product.artisan.name}
                   fallback={
                     <div className="flex items-center gap-3 mb-5 p-3 rounded-lg bg-slate-50 border border-slate-100">
-                      <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold uppercase flex-shrink-0">
+                      <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold uppercase shrink-0">
                         {product.artisan.name.charAt(0)}
                       </div>
                       <div className="flex-1">
@@ -294,7 +293,7 @@ export default function ProductPage() {
                 />
               ) : (
                 <div className="flex items-center gap-3 mb-5 p-3 rounded-lg bg-slate-50 border border-slate-100">
-                  <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold uppercase flex-shrink-0">
+                  <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold uppercase shrink-0">
                     {product.artisan.name.charAt(0)}
                   </div>
                   <div className="flex-1">
@@ -423,14 +422,6 @@ export default function ProductPage() {
               </div>
             )}
 
-            <div className="rounded-xl bg-white p-5 shadow-sm border border-border">
-              <RecommendationsSection
-                title="You might also like"
-                subtitle="AI-curated picks based on this painting and your cart"
-                excludeIds={[productId]}
-                limit={6}
-              />
-            </div>
           </div>
 
           <aside className="space-y-6">
