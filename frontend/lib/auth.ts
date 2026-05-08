@@ -126,6 +126,6 @@ export function getStoredUser(): AuthUser | null {
 }
 
 // Legacy helper used by older pages
-export function getUser(): User | null {
+export function getUser(): AuthUser | null {
   return getStoredUser()
 }

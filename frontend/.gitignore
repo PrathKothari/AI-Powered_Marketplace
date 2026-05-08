@@ -68,3 +68,6 @@ pnpm-lock.yaml
 
 # misc
 .DS_Store
+
+# local CLI installers (do not commit large binaries)
+google-cloud-cli-*.tar.gz

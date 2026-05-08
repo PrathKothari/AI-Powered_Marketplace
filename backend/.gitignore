@@ -47,6 +47,7 @@ Thumbs.db
 .coverage
 htmlcov/
 service-account.json
+ai-market-asst-*.json
 temp_uploads/
 temp_outputs/
 generated_media/
