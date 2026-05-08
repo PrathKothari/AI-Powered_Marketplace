@@ -2,7 +2,7 @@ steps:
   - name: gcr.io/cloud-builders/docker
     args:
       - build
-      - --tag=us-central1-docker.pkg.dev/$PROJECT_ID/kalasetu/backend:$COMMIT_SHA
+      - --tag=us-central1-docker.pkg.dev/$PROJECT_ID/kalasetu/backend:$BUILD_ID
       - --tag=us-central1-docker.pkg.dev/$PROJECT_ID/kalasetu/backend:latest
       - .
 
@@ -18,7 +18,7 @@ steps:
       - run
       - deploy
       - kalasetu-backend
-      - --image=us-central1-docker.pkg.dev/$PROJECT_ID/kalasetu/backend:$COMMIT_SHA
+      - --image=us-central1-docker.pkg.dev/$PROJECT_ID/kalasetu/backend:$BUILD_ID
       - --region=us-central1
       - --platform=managed
       - --allow-unauthenticated
