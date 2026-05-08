@@ -343,8 +343,18 @@ export const updateUserProfile = async (payload: UpdateProfilePayload): Promise<
     return fetchApi('/users/profile', { method: 'PATCH', data: payload, token })
 }
 
-export const getUserProfile = async (userId: string): Promise<UserProfile> => {
-    return fetchApi<UserProfile>(`/users/profile/${userId}`)
+export const getUserProfile = async (userId: string): Promise<UserProfile | null> => {
+    // Silently handle 404s — old seeded products may use a display name as "artisanId"
+    // rather than a real Firebase UID, which won't resolve to a user document.
+    try {
+        const res = await fetch(`${API_BASE_URL}/users/profile/${encodeURIComponent(userId)}`, {
+            headers: { 'Content-Type': 'application/json' },
+        })
+        if (!res.ok) return null
+        return await res.json() as UserProfile
+    } catch {
+        return null
+    }
 }
 
 // ─── Live Streaming ──────────────────────────────────────────────────────────
@@ -403,4 +413,100 @@ export const endLiveSession = async (sessionId: string): Promise<LiveSession> =>
     const token = getAuthToken()
     if (!token) throw new Error('You must be logged in')
     return fetchApi<LiveSession>(`/live/sessions/${sessionId}/end`, { method: 'PATCH', token })
+}
+
+// ─── Storytelling (AI reel generation) ───────────────────────────────────────
+
+export interface StoryCreative {
+    title: string
+    hook: string
+    main: string
+    cta: string
+    tagline: string
+    music_mood: string
+    style_notes: string
+    visual_keywords: string[]
+    scene_captions: string[]
+}
+
+export interface StoryVideoResponse {
+    video_url: string
+    local_path?: string
+    creative: StoryCreative
+}
+
+export interface GenerateStoryPayload {
+    description: string
+    image_urls: string[]
+    product_name?: string
+    tone?: string
+    audience?: string
+    style_preset?: string
+    duration_per_image?: number
+}
+
+export const generateStoryVideo = async (payload: GenerateStoryPayload): Promise<StoryVideoResponse> => {
+    return fetchApi<StoryVideoResponse>('/storytelling/generate', {
+        method: 'POST',
+        data: payload,
+    })
+}
+
+// ─── Recommendations ──────────────────────────────────────────────────────────
+
+export interface PaintingSignal {
+    productId?: string
+    title?: string
+    style?: string | string[]
+    theme?: string | string[]
+    artist?: string
+    colorPalette?: string | string[]
+    price?: number
+    priceRange?: string
+    interactionType?: string
+    rating?: number
+    reviewCount?: number
+    stock?: number
+}
+
+export interface RecommendationItem {
+    productId: string
+    title: string
+    style?: string | null
+    theme?: string | null
+    artist?: string | null
+    colorPalette: string[]
+    priceRange?: string | null
+    price?: number | null
+    reason: string
+}
+
+export interface RecommendationRequestPayload {
+    userId?: string
+    cartItems?: PaintingSignal[]
+    pastInteractions?: PaintingSignal[]
+    excludeIds?: string[]
+    limit?: number
+}
+
+export const getRecommendations = async (
+    payload: RecommendationRequestPayload = {}
+): Promise<RecommendationItem[]> => {
+    try {
+        const body = {
+            userId: payload.userId,
+            cartItems: payload.cartItems || [],
+            pastInteractions: payload.pastInteractions || [],
+            excludeIds: payload.excludeIds || [],
+            limit: payload.limit || 6,
+        }
+        const res = await fetchApi<{ recommendations: RecommendationItem[] }>('/recommendation/', {
+            method: 'POST',
+            data: body,
+        })
+        return res.recommendations || []
+    } catch (err) {
+        console.error('Failed to fetch recommendations:', err)
+        return []
+    }
 }

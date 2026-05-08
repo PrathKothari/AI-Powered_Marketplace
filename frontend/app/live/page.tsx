@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { getLiveSessions, type LiveSession } from '@/lib/api'
 import { useAuth } from '@/context/AuthContext'
 import LiveSessionCard from '@/components/live/LiveSessionCard'
+import Navbar from '@/components/navbar'
 import { Button } from '@/components/ui/button'
 import { Radio, Video } from 'lucide-react'
 
@@ -24,6 +25,8 @@ export default function LivePage() {
   const replaySessions = sessions.filter(s => s.status === 'ended')
 
   return (
+    <>
+    <Navbar />
     <main className="min-h-screen bg-slate-50 px-4 py-10">
       <div className="max-w-6xl mx-auto space-y-8">
         {/* Header */}
@@ -91,5 +94,6 @@ export default function LivePage() {
         )}
       </div>
     </main>
+    </>
   )
 }

@@ -109,14 +109,24 @@ def _normalize_creative(data: Dict[str, Any], description: str, image_count: int
 
 @lru_cache(maxsize=1)
 def _get_model() -> Any:
-    if vertexai is None or GenerativeModel is None:
-        return None
+    # Prefer the simpler GEMINI_API_KEY flow (google-generativeai)
+    if settings.GEMINI_API_KEY:
+        try:
+            import google.generativeai as genai
+            genai.configure(api_key=settings.GEMINI_API_KEY)
+            return genai.GenerativeModel(settings.GEMINI_MODEL_NAME)
+        except Exception:
+            pass
 
-    if not settings.GOOGLE_CLOUD_PROJECT:
-        return None
+    # Fall back to Vertex AI if a Google Cloud project is configured
+    if vertexai is not None and GenerativeModel is not None and settings.GOOGLE_CLOUD_PROJECT:
+        try:
+            vertexai.init(project=settings.GOOGLE_CLOUD_PROJECT, location=settings.GOOGLE_CLOUD_LOCATION)
+            return GenerativeModel(settings.GEMINI_MODEL_NAME)
+        except Exception:
+            pass
 
-    vertexai.init(project=settings.GOOGLE_CLOUD_PROJECT, location=settings.GOOGLE_CLOUD_LOCATION)
-    return GenerativeModel(settings.GEMINI_MODEL_NAME)
+    return None
 
 
 def _fallback_copy(description: str, image_count: int, style_preset: str) -> Dict[str, Any]:

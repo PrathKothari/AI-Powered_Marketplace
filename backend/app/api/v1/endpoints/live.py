@@ -156,25 +156,60 @@ async def create_session(
 
 @router.get("/sessions")
 async def list_sessions() -> List[Dict[str, Any]]:
-    """List all live sessions (active first) and recent ended sessions."""
+    """List all live sessions (active first) and recent ended sessions.
+
+    Auto-concludes any 'live' sessions that have no active streaming pipeline
+    (e.g., backend restarted, or the streamer closed their tab without
+    calling /end). Stale sessions are moved to the ended list.
+    """
     db = get_db()
+    now_iso = datetime.utcnow().isoformat()
 
-    # Get live sessions (sort in Python to avoid requiring a Firestore composite index)
+    # Get sessions currently marked as "live" in Firestore
     live_query = db.collection("live_sessions").where("status", "==", "live").limit(20)
-    live_sessions = [doc.to_dict() for doc in live_query.stream()]
-    live_sessions.sort(key=lambda s: s.get("startedAt", ""), reverse=True)
+    all_live_docs = [doc.to_dict() for doc in live_query.stream()]
 
-    # Update viewer counts from in-memory state
-    for session in live_sessions:
+    truly_live: List[Dict[str, Any]] = []
+    auto_ended: List[Dict[str, Any]] = []
+
+    for session in all_live_docs:
         sid = session["sessionId"]
-        session["viewerCount"] = stream_manager.get_viewer_count(sid)
+        is_active = (
+            sid in stream_manager.ffmpeg_processes
+            and stream_manager.ffmpeg_processes[sid].poll() is None
+        )
 
-    # Get recent ended sessions (for replays)
+        if is_active:
+            session["viewerCount"] = stream_manager.get_viewer_count(sid)
+            truly_live.append(session)
+        else:
+            # Stale session — mark it ended in Firestore and move to replays
+            update_data = {
+                "status": "ended",
+                "endedAt": now_iso,
+            }
+            try:
+                db.collection("live_sessions").document(sid).update(update_data)
+            except Exception as e:
+                logger.warning("Failed to auto-end stale session %s: %s", sid, e)
+            session.update(update_data)
+            session["viewerCount"] = 0
+            auto_ended.append(session)
+
+    truly_live.sort(key=lambda s: s.get("startedAt", ""), reverse=True)
+
+    # Get previously ended sessions (replays)
     ended_query = db.collection("live_sessions").where("status", "==", "ended").limit(20)
     ended_sessions = [doc.to_dict() for doc in ended_query.stream()]
-    ended_sessions.sort(key=lambda s: s.get("endedAt", ""), reverse=True)
+    # Merge in the ones we just auto-ended (they may not yet appear in the query result)
+    seen_ids = {s["sessionId"] for s in ended_sessions}
+    for s in auto_ended:
+        if s["sessionId"] not in seen_ids:
+            ended_sessions.append(s)
 
-    return live_sessions + ended_sessions
+    ended_sessions.sort(key=lambda s: s.get("endedAt") or "", reverse=True)
+
+    return truly_live + ended_sessions
 
 
 @router.get("/sessions/{session_id}")
@@ -368,7 +403,23 @@ async def websocket_stream(websocket: WebSocket, session_id: str):
             ffmpeg_proc.wait(timeout=10)
         except subprocess.TimeoutExpired:
             ffmpeg_proc.kill()
+        stream_manager.ffmpeg_processes.pop(session_id, None)
         logger.info("FFmpeg pipeline closed for session %s", session_id)
+
+        # Auto-mark the session as ended in Firestore so it moves to replays
+        # (handles the case where the streamer closes their tab without calling /end)
+        try:
+            db = get_db()
+            doc_ref = db.collection("live_sessions").document(session_id)
+            doc = doc_ref.get()
+            if doc.exists and doc.to_dict().get("status") == "live":
+                doc_ref.update({
+                    "status": "ended",
+                    "endedAt": datetime.utcnow().isoformat(),
+                })
+                logger.info("Auto-ended session %s after streamer disconnect", session_id)
+        except Exception as e:
+            logger.warning("Failed to auto-end session %s on disconnect: %s", session_id, e)
 
 
 # ── WebSocket: Live Chat ──────────────────────────────────────────────────────

@@ -341,17 +341,23 @@ Two-step Razorpay payment flow: create a server-side order → open the Razorpay
 
 ## Storytelling — `/api/v1/storytelling`
 
-Generates product story copy and story videos for the frontend. The video pipeline accepts either uploaded image files or image URLs/local paths, then renders a short storytelling reel and returns the generated creative alongside the video URL.
+AI-powered reel generation pipeline. Given product images and a description, renders a short vertical (1080×1920) storytelling video with ken-burns effect, random xfade transitions, and optional TTS narration. Used by the Sell page to auto-generate a promo reel for each listing, which is then shown on the product page and the `/reels` feed.
+
+**Pipeline stages:**
+1. **Ad copy generation** — Gemini (via `GEMINI_API_KEY`) generates a `title`, `hook`, `main`, `cta`, `tagline`, `music_mood`, `visual_keywords`, and per-image `scene_captions`. Falls back to templated copy if the API is unavailable.
+2. **TTS audio** — Google Cloud Text-to-Speech generates narration from the script. If Google TTS credentials are missing, the video is rendered silent (no failure).
+3. **Video rendering** — FFmpeg produces a 1080×1920 H.264/AAC MP4 with per-image zoompan, xfade transitions, and audio muxing.
+4. **Upload** — The rendered MP4 is uploaded to Firebase Storage under `reels/`. Falls back to serving from `/media/videos/` locally if upload fails.
 
 **Story video request schema**
 ```json
 {
   "description": "string",
-  "image_urls": ["string"],
+  "image_urls": ["string (public URL or local path)"],
   "product_name": "string (optional)",
   "tone": "premium",
   "audience": "online shoppers",
-  "style_preset": "museum_cinematic",
+  "style_preset": "museum_cinematic | artisan_story | editorial_premium | modern_minimal",
   "duration_per_image": 4
 }
 ```
@@ -359,8 +365,8 @@ Generates product story copy and story videos for the frontend. The video pipeli
 **Story video response schema**
 ```json
 {
-  "video_url": "string",
-  "local_path": "string (optional)",
+  "video_url": "string (public URL to the rendered reel)",
+  "local_path": "string (optional, server-local path)",
   "creative": {
     "title": "string",
     "hook": "string",
@@ -377,11 +383,24 @@ Generates product story copy and story videos for the frontend. The video pipeli
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| `POST` | `/api/v1/storytelling/generate` | No | Generates a full storytelling video from a JSON body. Frontend-friendly endpoint for the product story pipeline. `image_urls` may contain public URLs or local paths during development/testing. Returns the rendered video URL plus the generated creative. |
-| `POST` | `/api/v1/storytelling/generate-video` | No | Multipart upload version of the same pipeline. Accepts uploaded image files and the same story metadata as form fields. |
-| `POST` | `/api/v1/storytelling/generate-copy` | No | Generates only the story copy/creative from form fields. |
-| `GET` | `/api/v1/storytelling/styles` | No | Returns the available style presets used by the pipeline. |
-- Signature verification: `HMAC-SHA256(key=RAZORPAY_KEY_SECRET, msg="{order_id}|{payment_id}")`.
+| `POST` | `/api/v1/storytelling/generate` | No | Generates a full storytelling video from a JSON body. `image_urls` may contain public URLs or local paths; each is downloaded/resolved before rendering. Returns the rendered video URL plus the generated creative. Used by the Sell page. |
+| `POST` | `/api/v1/storytelling/generate-video` | No | Multipart upload version of the same pipeline. Accepts uploaded image files directly as form fields. |
+| `POST` | `/api/v1/storytelling/generate-copy` | No | Generates only the story copy/creative (no video). Useful for previewing ad copy before committing to a full render. |
+| `GET` | `/api/v1/storytelling/styles` | No | Returns the available style presets (museum_cinematic, artisan_story, editorial_premium, modern_minimal). |
+
+**Integration with the product lifecycle:**
+- When a user lists a product via `/sell`, the frontend uploads images to Firebase Storage, then calls `POST /storytelling/generate` with those URLs.
+- The returned `video_url` is stored on the product as `storyVideo` via `POST /catalog`.
+- The `/product/{id}` page renders it in the "Craft Story Video" section.
+- The `/reels` page fetches all catalog products with a non-empty `storyVideo` and displays them as an infinite TikTok-style feed.
+
+**Error handling:** If Gemini/TTS/GCS are unavailable, the pipeline degrades gracefully (templated copy, silent video, local serving). The endpoint only fails if FFmpeg is missing or the image inputs are invalid.
+
+**System dependencies:**
+- **FFmpeg** — required for video rendering
+- **GEMINI_API_KEY** — optional; enables AI-generated ad copy (falls back to templates)
+- **Google Cloud TTS credentials** — optional; enables audio narration (silent video fallback)
+- **Firebase Storage** — optional; falls back to local `/media/videos/` serving
 
 ---
 
@@ -431,12 +450,6 @@ Handles direct media uploads (images and audio) for artisan products.
 
 ---
 
-## Storytelling — `/api/v1/storytelling`
-
-Manages craft stories (text + audio narrations) linked to paintings and artisans.
-
----
-
 ## Discovery — `/api/v1/discovery`
 
 AI-powered craft origin detection and visual product search. Combines CLIP image embeddings, Pinecone vector similarity search, and Gemini 2.5 Flash vision analysis.
@@ -473,12 +486,6 @@ AI-powered craft origin detection and visual product search. Combines CLIP image
 3. Matching product details are fetched from Firestore
 4. Image + match context is sent to **Gemini 2.5 Flash** for a rich craft origin analysis
 5. First call is slower (~5-10s) due to CLIP model download; subsequent calls are fast
-
----
-
-## Recommendation — `/api/v1/recommendation`
-
-AI-powered product recommendations (under development).
 
 ---
 

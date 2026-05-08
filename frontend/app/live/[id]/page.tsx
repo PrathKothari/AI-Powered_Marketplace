@@ -7,6 +7,7 @@ import LivePlayer from '@/components/live/LivePlayer'
 import LiveChat from '@/components/live/LiveChat'
 import FeaturedProduct from '@/components/live/FeaturedProduct'
 import SellerBio from '@/components/SellerBio'
+import Navbar from '@/components/navbar'
 import { ArrowLeft, Eye } from 'lucide-react'
 import Link from 'next/link'
 
@@ -56,6 +57,8 @@ export default function WatchLivePage() {
     : session.recordingUrl || session.hlsUrl
 
   return (
+    <>
+    <Navbar />
     <main className="min-h-screen bg-slate-50">
       <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
         {/* Back link + title */}
@@ -104,5 +107,6 @@ export default function WatchLivePage() {
         </div>
       </div>
     </main>
+    </>
   )
 }
