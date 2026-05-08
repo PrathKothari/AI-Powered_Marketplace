@@ -1,3 +1,4 @@
+from __future__ import annotations
 import logging
 
 from fastapi import APIRouter
@@ -5,7 +6,6 @@ from fastapi.concurrency import run_in_threadpool
 
 from app.schemas.recommendation import RecommendationRequest, RecommendationResponse
 from app.services.recommendation.recommender import generate_recommendations
-
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
